@@ -141,8 +141,8 @@ function parseWorkbook(wb) {
 
     const gm        = parseFloat(findVal(COL_MAP.gm))        || 0;
     const annualRev = parseFloat(findVal(COL_MAP.annualRev)) || 0;
-    const rawMargin = findVal(COL_MAP.annualMargin);
-    const annualMargin = rawMargin !== null ? parseFloat(rawMargin) : annualRev * (gm / 100);
+    const parsedMargin = parseFloat(findVal(COL_MAP.annualMargin));
+    const annualMargin = Number.isFinite(parsedMargin) ? parsedMargin : annualRev * (gm / 100);
 
     const emp = {
       name:         String(name).trim(),

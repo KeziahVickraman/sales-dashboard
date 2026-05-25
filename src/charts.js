@@ -19,6 +19,7 @@ function mkChart(id, cfg) {
 
 /** Format a number as compact currency string */
 function fmt(n) {
+  if (!Number.isFinite(n)) return '$0';
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000)     return '$' + Math.round(n / 1_000) + 'k';
   return '$' + Math.round(n);
@@ -237,6 +238,31 @@ function renderAttritionByRoleChart(data, realByRole) {
   });
 }
 
+function renderAttritionAnalysisChart(rows) {
+  mkChart('c-aa-trend', {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => String(r.year)),
+      datasets: [
+        { type: 'line', label: 'Attrition %', data: rows.map(r => r.attritionPct), borderColor: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.08)', yAxisID: 'pct', tension: 0.3, pointRadius: 5, borderWidth: 2 },
+        { type: 'line', label: 'Retention %', data: rows.map(r => r.retentionPct), borderColor: '#1D9E75', yAxisID: 'pct', tension: 0.3, pointRadius: 5, borderWidth: 2 },
+        { label: 'Revenue lost', data: rows.map(r => r.revenueLost), backgroundColor: '#BA7517', borderRadius: 4, yAxisID: 'money' },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'money' ? `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` : `${ctx.dataset.label}: ${ctx.parsed.y}%` } },
+      },
+      scales: {
+        pct: { position: 'left', min: 0, max: 100, ticks: { callback: v => v + '%' } },
+        money: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => fmt(v) } },
+      },
+    },
+  });
+}
+
 function renderFeatureImportanceChart() {
   mkChart('c-feat', {
     type: 'bar',
@@ -376,6 +402,9 @@ function renderBubbleChart(data) {
   const clients = [...new Set(data.map(e => e.client))];
   const colorMap = {};
   clients.forEach((c, i) => { colorMap[c] = PALETTE[i % PALETTE.length]; });
+  const gmValues = data.map(e => e.gm).filter(Number.isFinite);
+  const xMin = gmValues.length ? Math.max(0, Math.min(...gmValues) - 2) : 0;
+  const xMax = gmValues.length ? Math.max(...gmValues) + 2 : 25;
 
   mkChart('c-bubble', {
     type: 'bubble',
@@ -403,7 +432,7 @@ function renderBubbleChart(data) {
         tooltip: { callbacks: { label: ctx => `${ctx.raw.name}: GM ${ctx.raw.x}% | Rev ${fmt(ctx.raw.y * 1000)}` } },
       },
       scales: {
-        x: { title: { display: true, text: 'GM%', font: { size: 11 } }, min: Math.max(0, Math.min(...data.map(e => e.gm)) - 2), max: Math.max(...data.map(e => e.gm)) + 2 },
+        x: { title: { display: true, text: 'GM%', font: { size: 11 } }, min: xMin, max: xMax },
         y: { title: { display: true, text: 'Annual rev ($k)', font: { size: 11 } }, ticks: { callback: v => '$' + v + 'k' } },
       },
     },

@@ -14,7 +14,7 @@
   <div class="app">
     <header class="app-header">
       <div class="header-left">
-        <span class="header-title">UNISON GROUP | Sales Decision Intelligence</span>
+        <span class="header-title">UNISON GROUP | Sales Decision Intelligence Dashboard</span>
         <span id="data-badge" class="data-source-badge ds-demo">
           <i class="ti ti-database"></i> Demo data
         </span>
@@ -46,12 +46,34 @@
 
     <!-- Navigation tabs -->
     <nav class="dash-nav">
-      <button class="tab active" onclick="showPanel('overview', this)"><i class="ti ti-chart-bar"></i> Overview</button>
-      <button class="tab" onclick="showPanel('trend', this)"><i class="ti ti-calendar-stats"></i> Historical Trend</button>
-      <button class="tab" onclick="showPanel('portfolio', this)"><i class="ti ti-briefcase"></i> Portfolio</button>
-      <button class="tab" onclick="showPanel('forecast', this)"><i class="ti ti-trending-up"></i> ML Forecast</button>
-      <button class="tab" onclick="showPanel('attrition', this)"><i class="ti ti-user-minus"></i> Attrition</button>
-      <button class="tab" onclick="showPanel('ai', this)"><i class="ti ti-sparkles"></i> AI Insights</button>
+      <div class="nav-section nav-section-overview">
+        <div class="nav-section-title">Overview</div>
+        <div class="nav-section-tabs">
+          <button class="tab active" onclick="showPanel('overview', this)"><i class="ti ti-chart-bar"></i> Overview</button>
+          <button class="tab" onclick="showPanel('portfolio', this)"><i class="ti ti-briefcase"></i> Portfolio</button>
+        </div>
+      </div>
+      <div class="nav-section nav-section-history">
+        <div class="nav-section-title">Historical Trends</div>
+        <div class="nav-section-tabs">
+          <button class="tab" onclick="showPanel('trend', this)"><i class="ti ti-calendar-stats"></i> Historical Trend</button>
+          <button class="tab" onclick="showPanel('attrition-analysis', this)"><i class="ti ti-table"></i> Attrition Analysis</button>
+        </div>
+      </div>
+      <div class="nav-section nav-section-future">
+        <div class="nav-section-title">Future Predicitions</div>
+        <div class="nav-section-tabs">
+          <button class="tab" onclick="showPanel('forecast', this)"><i class="ti ti-trending-up"></i> Revenue Forecast</button>
+          <button class="tab" onclick="showPanel('attrition', this)"><i class="ti ti-user-minus"></i> Attrition Predicition</button>
+        </div>
+      </div>
+      <div class="nav-section nav-section-bonus">
+        <div class="nav-section-title">BONUS</div>
+        <div class="nav-section-tabs">
+          <button class="tab" onclick="showPanel('decision', this)"><i class="ti ti-scale"></i> Decision Engine</button>
+          <button class="tab" onclick="showPanel('ai', this)"><i class="ti ti-sparkles"></i> AI Insights</button>
+        </div>
+      </div>
     </nav>
 
     <main class="dash-main">
@@ -274,6 +296,33 @@
         </div>
       </section>
 
+      <!-- ATTRITION ANALYSIS -->
+      <section id="panel-attrition-analysis" class="panel">
+        <div class="filter-bar">
+          <select id="aa-year" onchange="renderAttritionAnalysis()">
+            <option value="">All years (2023â€“2025)</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025" selected>2025</option>
+          </select>
+          <select id="aa-client" onchange="renderAttritionAnalysis()"><option value="">All clients</option></select>
+          <select id="aa-role" onchange="renderAttritionAnalysis()"><option value="">All roles</option></select>
+          <select id="aa-loc" onchange="renderAttritionAnalysis()"><option value="">All locations</option></select>
+        </div>
+        <div class="card">
+          <div class="card-title">Attrition analysis trend</div>
+          <div class="legend"><span><span class="leg-sq" style="background:#E24B4A"></span>Attrition</span><span><span class="leg-sq" style="background:#1D9E75"></span>Retention</span><span><span class="leg-sq" style="background:#BA7517"></span>Revenue lost</span></div>
+          <div class="chart-wrap h240"><canvas id="c-aa-trend" role="img" aria-label="Attrition analysis trend">Attrition analysis trend.</canvas></div>
+        </div>
+        <div class="card" id="attrition_analysis" style="overflow-x:auto">
+          <div class="card-title">attrition_analysis</div>
+          <table class="emp-table">
+            <thead><tr><th>Year</th><th>Opening HC</th><th>New hires</th><th>Left</th><th>Attrition rate</th><th>Retention rate</th><th>Revenue lost</th></tr></thead>
+            <tbody id="attrition-analysis-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ATTRITION -->
       <section id="panel-attrition" class="panel">
         <p class="section-intro" id="a-source-note">—</p>
@@ -306,6 +355,108 @@
         <div class="card">
           <div class="card-title">ML feature importance — attrition drivers</div>
           <div class="chart-wrap h180"><canvas id="c-feat" role="img" aria-label="Feature importance">Feature importance.</canvas></div>
+        </div>
+        <div class="card transparency-card">
+          <details>
+            <summary class="transparency-summary">
+              <i class="ti ti-info-circle"></i>
+              <span>See model used for prediction</span>
+              <i class="ti ti-chevron-down transparency-chevron"></i>
+            </summary>
+            <div class="transparency-body">
+              <h4>Current prediction model</h4>
+              <p>The current attrition prediction is a transparent rule-based scoring model, not a trained ML model yet. It uses tenure pattern and gross margin as the strongest signals, then caps the final score at 95.</p>
+              <div class="transparency-formula">
+                risk score = 38 + tenure score + GM score
+              </div>
+              <h4>Tenure score</h4>
+              <ul>
+                <li><code>&lt; 6 months</code> = +30</li>
+                <li><code>6-11 months</code> = +20</li>
+                <li><code>&gt; 42 months</code> = +18</li>
+                <li>all other tenure bands = +8</li>
+              </ul>
+              <h4>Gross margin score</h4>
+              <ul>
+                <li><code>GM &lt; 12%</code> = +18</li>
+                <li><code>GM &gt; 18%</code> = +5</li>
+                <li>all other GM bands = +10</li>
+              </ul>
+              <p class="transparency-note">The feature-importance chart reflects this current proxy model. A trained model can replace it once labelled historical attrition outcomes are available.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- DECISION ENGINE -->
+      <section id="panel-decision" class="panel">
+        <div class="decision-layout">
+          <div class="card">
+            <div class="card-title">Retention package model</div>
+            <div class="slider-row">
+              <label class="slider-label" for="sl-p">Attrition probability</label>
+              <input id="sl-p" type="range" min="0" max="80" value="25" oninput="updateDecision()" />
+              <span class="slider-val" id="out-p">25%</span>
+            </div>
+            <div class="slider-row">
+              <label class="slider-label" for="sl-cr">Replacement cost</label>
+              <input id="sl-cr" type="range" min="5000" max="80000" step="1000" value="30000" oninput="updateDecision()" />
+              <span class="slider-val" id="out-cr">$30k</span>
+            </div>
+            <div class="slider-row">
+              <label class="slider-label" for="sl-cp">Package cost</label>
+              <input id="sl-cp" type="range" min="1000" max="40000" step="1000" value="8000" oninput="updateDecision()" />
+              <span class="slider-val" id="out-cp">$8k</span>
+            </div>
+            <div class="slider-row">
+              <label class="slider-label" for="sl-lift">Risk reduction</label>
+              <input id="sl-lift" type="range" min="5" max="80" value="40" oninput="updateDecision()" />
+              <span class="slider-val" id="out-lift">40%</span>
+            </div>
+            <div class="formula-box" id="formula-out"></div>
+          </div>
+          <div class="card">
+            <div id="decision-result" class="decision-box">
+              <div class="decision-title" id="dec-title">Decision pending</div>
+              <div class="decision-sub" id="dec-sub"></div>
+            </div>
+            <div class="kpi-grid">
+              <div class="kpi"><div class="kpi-label">Do nothing</div><div class="kpi-value" id="dec-nothing">-</div></div>
+              <div class="kpi"><div class="kpi-label">Offer package</div><div class="kpi-value" id="dec-offer-cost">-</div></div>
+              <div class="kpi"><div class="kpi-label">Break-even p*</div><div class="kpi-value" id="dec-pstar">-</div></div>
+              <div class="kpi"><div class="kpi-label">Expected saving</div><div class="kpi-value" id="dec-savings">-</div></div>
+            </div>
+            <div class="chart-wrap h240"><canvas id="c-decision" role="img" aria-label="Retention decision cost curves">Decision chart.</canvas></div>
+          </div>
+        </div>
+        <div class="card transparency-card">
+          <details>
+            <summary class="transparency-summary">
+              <i class="ti ti-info-circle"></i>
+              <span>See model used for decision</span>
+              <i class="ti ti-chevron-down transparency-chevron"></i>
+            </summary>
+            <div class="transparency-body">
+              <h4>Expected cost model</h4>
+              <p>The decision engine compares the expected cost of doing nothing against the expected cost of offering a retention package.</p>
+              <div class="transparency-formula">
+                Do nothing = p × C_replace<br>
+                Offer package = C_package + (p - lift × p) × C_replace
+              </div>
+              <h4>Break-even rule</h4>
+              <div class="transparency-formula">
+                Offer iff p &gt; C_package / (C_replace × lift)
+              </div>
+              <h4>Operating assumptions</h4>
+              <ul>
+                <li><code>p</code> is the estimated attrition probability from judgement or the prediction tab.</li>
+                <li><code>C_replace</code> is the total replacement cost, including hiring, onboarding, downtime, and client disruption.</li>
+                <li><code>C_package</code> is the incremental cost of the retention offer.</li>
+                <li><code>lift</code> is the expected proportional reduction in attrition probability after the package is offered.</li>
+                <li>The model only evaluates direct expected cost and does not include fairness, precedent, morale, or non-financial client-risk considerations.</li>
+              </ul>
+            </div>
+          </details>
         </div>
       </section>
 

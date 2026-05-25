@@ -33,12 +33,23 @@ let _rateInputsSynced = false;
 
 /** Format number as compact currency */
 function fmt(n) {
+  if (!Number.isFinite(n)) return '$0';
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000)     return '$' + Math.round(n / 1_000) + 'k';
   return '$' + Math.round(n);
 }
 
 function el(id) { return document.getElementById(id); }
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 function showPanel(id, btn) {
@@ -48,7 +59,9 @@ function showPanel(id, btn) {
   if (btn) btn.classList.add('active');
   // Lazy-render on tab open
   if (id === 'forecast')  renderForecast();
+  if (id === 'attrition-analysis') renderAttritionAnalysis();
   if (id === 'attrition') renderAttrition();
+  if (id === 'decision')  updateDecision();
   if (id === 'portfolio') renderPortfolio();
   if (id === 'trend')     renderTrend();
 }
@@ -61,7 +74,7 @@ function showStatus(msg, type) {
   const icon = type === 'loading' ? '<span class="spinner"></span>'
              : type === 'success' ? '<i class="ti ti-check"></i>'
              : '<i class="ti ti-x"></i>';
-  statusEl.innerHTML = `${icon}<span>${msg}</span>`;
+  statusEl.innerHTML = `${icon}<span>${escapeHTML(msg)}</span>`;
 }
 
 function handleFile(file) {
@@ -97,8 +110,9 @@ function handleFile(file) {
 function refreshAll() {
   initOverview();
   renderForecast();
-  renderAttrition();
   resetFilters();
+  renderAttritionAnalysis();
+  renderAttrition();
   renderPortfolio();
   renderTrend();
 }
@@ -110,7 +124,7 @@ function initOverview() {
   const avgGM       = totalRev > 0 ? (totalMargin / totalRev * 100) : 0;
   const hc          = DATA.length;
   const rpr         = hc > 0 ? totalRev / hc : 0;
-  const attrRate    = Math.round(DATA.filter(e => e.months < 8 || e.months > 42).length / hc * 100);
+  const attrRate    = hc > 0 ? Math.round(DATA.filter(e => e.months < 8 || e.months > 42).length / hc * 100) : 0;
 
   el('kpi-hc').textContent    = hc;
   el('kpi-hc-d').textContent  = isLiveData ? 'from your data' : 'demo data';
@@ -187,7 +201,7 @@ function renderForecast() {
   const proj = [hist[2] * (1 + sc.growth[0]), 0, 0];
   proj[1] = proj[0] * (1 + sc.growth[1]);
   proj[2] = proj[1] * (1 + sc.growth[2]);
-  const cagr = (Math.pow(proj[2] / hist[2], 1 / 3) - 1) * 100;
+  const cagr = hist[2] > 0 ? (Math.pow(proj[2] / hist[2], 1 / 3) - 1) * 100 : 0;
 
   el('fc-26r').textContent = fmt(proj[0]);
   el('fc-27r').textContent = fmt(proj[1]);
@@ -199,8 +213,9 @@ function renderForecast() {
   hcP[1] = Math.round(hcP[0] * (1 + sc.hcGrowth[1]));
   hcP[2] = Math.round(hcP[1] * (1 + sc.hcGrowth[2]));
 
-  const rprH = hist.map((r, i) => r / hcH[i]);
-  const rprP = proj.map((r, i) => r / hcP[i]);
+  const safeDiv = (a, b) => b > 0 ? a / b : 0;
+  const rprH = hist.map((r, i) => safeDiv(r, hcH[i]));
+  const rprP = proj.map((r, i) => safeDiv(r, hcP[i]));
 
   renderForecastChart(hist, proj);
   renderHeadcountForecastChart(hcH, hcP);
@@ -212,10 +227,10 @@ function renderForecast() {
     ['Annual revenue',     ...[hist[2], ...proj].map(fmt)],
     ['Annual margin',      ...[hist[2] * 0.137, ...proj.map(v => v * 0.14)].map(fmt)],
     ['GM %',               '13.7%', '14.0%', '14.0%', '14.0%'],
-    ['Revenue / resource', ...[hist[2] / base2025HC, ...rprP].map(fmt)],
+    ['Revenue / resource', ...[safeDiv(hist[2], base2025HC), ...rprP].map(fmt)],
   ];
   el('proj-tbody').innerHTML = rows
-    .map((r, i) => `<tr class="${i === 1 || i === 2 ? 'bold' : ''}">${r.map(c => `<td>${c}</td>`).join('')}</tr>`)
+    .map((r, i) => `<tr class="${i === 1 || i === 2 ? 'bold' : ''}">${r.map(c => `<td>${escapeHTML(c)}</td>`).join('')}</tr>`)
     .join('');
 }
 
@@ -287,17 +302,70 @@ function renderAttrition() {
     const hLabel = e.riskScore >= 70 ? 'High' : e.riskScore >= 50 ? 'Medium' : 'Low';
     const sig    = e.months < 8 ? 'New hire' : e.months > 42 ? 'Tenure plateau' : e.gm < 12 ? 'Low margin' : 'Stable';
     return `<tr>
-      <td>${e.name}</td>
-      <td>${e.role}</td>
-      <td>${e.months}mo</td>
+      <td>${escapeHTML(e.name)}</td>
+      <td>${escapeHTML(e.role)}</td>
+      <td>${escapeHTML(e.months)}mo</td>
       <td>${fmt(e.annualRev)}</td>
       <td>${e.gm.toFixed(1)}%</td>
       <td><strong>${e.riskScore}</strong></td>
-      <td><span class="badge ${hClass}">${hLabel}</span> <span style="font-size:11px;color:var(--color-text-secondary)">${sig}</span></td>
+      <td><span class="badge ${hClass}">${hLabel}</span> <span style="font-size:11px;color:var(--color-text-secondary)">${escapeHTML(sig)}</span></td>
     </tr>`;
   }).join('');
 
   renderFeatureImportanceChart();
+}
+
+function renderAttritionAnalysis() {
+  const analysisBody = el('attrition-analysis-tbody');
+  if (analysisBody) {
+    const yearF = el('aa-year')?.value || '';
+    const cF    = el('aa-client')?.value || '';
+    const rF    = el('aa-role')?.value || '';
+    const lF    = el('aa-loc')?.value || '';
+    const filtered = DATA.filter(e =>
+      (cF === '' || e.client === cF) &&
+      (rF === '' || e.role === rF) &&
+      (lF === '' || e.loc === lF)
+    );
+    const hasSegmentFilter = cF !== '' || rF !== '' || lF !== '';
+    const real = ATTRITION_DATA;
+    const haveRealTrend = !!(real && real.trend && real.trend[2025]);
+    const currentAttrRate = filtered.length > 0 ? Math.round(filtered.filter(e => e.months < 8 || e.months > 42).length / filtered.length * 100) : 0;
+    const fallbackRates = [12, 14, currentAttrRate];
+    const rows = TREND_YEARS.map((year, i) => {
+      const active = filtered.filter(e => e.yearly[year] && e.yearly[year].rev > 0);
+      const prevActive = i > 0 ? filtered.filter(e => e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
+      const activeRev = active.reduce((s, e) => s + (e.yearly[year]?.rev || 0), 0);
+      const proxyRate = active.length > 0 ? active.filter(e => e.months < 8 || e.months > 42).length / active.length : fallbackRates[i] / 100;
+      const trend = haveRealTrend && !hasSegmentFilter ? real.trend[year] : null;
+      const impact = real?.revenueImpact?.[year];
+      const rate = trend ? trend.attritionRate : fallbackRates[i] / 100;
+      const filteredRate = trend ? rate : proxyRate;
+      const retention = trend ? trend.retentionRate : 1 - filteredRate;
+      const openingHC = trend ? trend.openingHC : active.length;
+      const newHires = trend ? trend.newHires : Math.max(0, active.length - prevActive.length);
+      const left = trend ? trend.left : Math.round(active.length * filteredRate);
+      const revenueLost = trend && impact?.revenueLost ? impact.revenueLost : activeRev * filteredRate;
+      return {
+        year, openingHC, newHires, left, revenueLost,
+        attritionPct: Math.round(filteredRate * 100),
+        retentionPct: Math.round(retention * 100),
+      };
+    });
+    const tableRows = yearF ? rows.filter(r => String(r.year) === yearF) : rows;
+    renderAttritionAnalysisChart(tableRows);
+    analysisBody.innerHTML = tableRows.map(row => {
+      return `<tr>
+        <td><strong>${row.year}</strong></td>
+        <td>${escapeHTML(row.openingHC)}</td>
+        <td>${escapeHTML(row.newHires)}</td>
+        <td>${escapeHTML(row.left)}</td>
+        <td>${row.attritionPct}%</td>
+        <td>${row.retentionPct}%</td>
+        <td>${fmt(row.revenueLost)}</td>
+      </tr>`;
+    }).join('');
+  }
 }
 
 // ── Decision Engine ──────────────────────────────────────────────────────────
@@ -351,15 +419,20 @@ function updateDecision() {
 function populateFilter(selectId, field) {
   const sel = el(selectId);
   if (!sel) return;
-  const existing = new Set(Array.from(sel.options).map(o => o.value));
+  const placeholder = sel.options[0]?.textContent || 'All';
+  const current = sel.value;
+  sel.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = placeholder;
+  sel.appendChild(all);
   [...new Set(DATA.map(e => e[field]))].sort().forEach(v => {
-    if (!existing.has(v)) {
-      const o = document.createElement('option');
-      o.value = v;
-      o.textContent = v;
-      sel.appendChild(o);
-    }
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = v;
+    sel.appendChild(o);
   });
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : '';
 }
 
 function resetFilters() {
@@ -368,6 +441,9 @@ function resetFilters() {
   populateFilter('tr-client',     'client');
   populateFilter('tr-role',       'role');
   populateFilter('tr-loc',        'loc');
+  populateFilter('aa-client',     'client');
+  populateFilter('aa-role',       'role');
+  populateFilter('aa-loc',        'loc');
 }
 
 function renderPortfolio() {
@@ -393,11 +469,11 @@ function renderPortfolio() {
     const h = e.gm >= 18 ? 'badge-green' : e.gm >= 13 ? 'badge-blue' : 'badge-amber';
     const l = e.gm >= 18 ? 'High margin' : e.gm >= 13 ? 'Healthy' : 'Watch';
     return `<tr>
-      <td>${e.name}</td>
-      <td>${e.client}</td>
-      <td>${e.role}</td>
-      <td>${e.loc}</td>
-      <td>${e.months}mo</td>
+      <td>${escapeHTML(e.name)}</td>
+      <td>${escapeHTML(e.client)}</td>
+      <td>${escapeHTML(e.role)}</td>
+      <td>${escapeHTML(e.loc)}</td>
+      <td>${escapeHTML(e.months)}mo</td>
       <td>${fmt(e.annualRev)}</td>
       <td>${e.gm.toFixed(1)}%</td>
       <td><span class="badge ${h}">${l}</span></td>
@@ -459,8 +535,9 @@ function renderTrend() {
 
   // Breakdown table — if a year is selected show only that row, else all
   const tableRows = yearF ? perYear.filter(p => p.year === focusYear) : perYear;
-  el('tr-tbody').innerHTML = tableRows.map((p, i) => {
-    const prevP = i > 0 ? tableRows[i - 1] : null;
+  el('tr-tbody').innerHTML = tableRows.map(p => {
+    const idx = TREND_YEARS.indexOf(p.year);
+    const prevP = idx > 0 ? perYear[idx - 1] : null;
     const yoy   = prevP && prevP.rev > 0 ? (p.rev - prevP.rev) / prevP.rev * 100 : null;
     const yoyStr = yoy === null ? '—' : (yoy > 0 ? '+' : '') + yoy.toFixed(1) + '%';
     return `<tr>
@@ -512,11 +589,11 @@ function buildDataSummary() {
   const totalRev    = DATA.reduce((s, e) => s + e.annualRev, 0);
   const totalMargin = DATA.reduce((s, e) => s + e.annualMargin, 0);
   const hc          = DATA.length;
-  const attrRate    = Math.round(DATA.filter(e => e.months < 8 || e.months > 42).length / hc * 100);
-  const avgGM       = (totalMargin / totalRev * 100).toFixed(1);
+  const attrRate    = hc > 0 ? Math.round(DATA.filter(e => e.months < 8 || e.months > 42).length / hc * 100) : 0;
+  const avgGM       = totalRev > 0 ? (totalMargin / totalRev * 100).toFixed(1) : '0.0';
   const topClient   = Object.entries(DATA.reduce((m, e) => { m[e.client] = (m[e.client] || 0) + e.annualRev; return m; }, {}))
                         .sort((a, b) => b[1] - a[1])[0];
-  const avgSalary   = DATA.reduce((s, e) => s + e.salary, 0) / hc;
+  const avgSalary   = hc > 0 ? DATA.reduce((s, e) => s + e.salary, 0) / hc : 0;
   const highRisk    = DATA.filter(e => e.months < 8 || e.gm < 12);
   const roles       = [...new Set(DATA.map(e => e.role))];
   const locs        = [...new Set(DATA.map(e => e.loc))];
@@ -579,7 +656,7 @@ async function runAI(type) {
     statusEl.style.display = 'none';
   } catch (err) {
     statusEl.className = 'status-bar status-error';
-    statusEl.innerHTML = `<i class="ti ti-x"></i><span>${err.message}</span>`;
+    statusEl.innerHTML = `<i class="ti ti-x"></i><span>${escapeHTML(err.message)}</span>`;
   }
 }
 
@@ -602,7 +679,7 @@ async function askAI() {
     statusEl.style.display = 'none';
   } catch (err) {
     statusEl.className = 'status-bar status-error';
-    statusEl.innerHTML = `<i class="ti ti-x"></i><span>${err.message}</span>`;
+    statusEl.innerHTML = `<i class="ti ti-x"></i><span>${escapeHTML(err.message)}</span>`;
     statusEl.style.display = 'flex';
   }
 }
