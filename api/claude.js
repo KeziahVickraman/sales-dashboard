@@ -1,16 +1,16 @@
+﻿// Vercel Serverless Function — replaces src/server.js Express proxy
+// Vercel automatically exposes this as POST /api/claude
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: { message: 'Method not allowed.' } });
+    return res.status(405).json({ error: { message: 'Method not allowed' } });
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not configured on the server.' } });
   }
 
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({
-        error: { message: 'ANTHROPIC_API_KEY is not set on the server.' },
-      });
-    }
-
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -24,8 +24,6 @@ export default async function handler(req, res) {
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (err) {
-    return res.status(500).json({
-      error: { message: err.message },
-    });
+    return res.status(500).json({ error: { message: err.message } });
   }
 }
