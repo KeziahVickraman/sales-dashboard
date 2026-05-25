@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Decision Intelligence Dashboard</title>
+  <link rel="stylesheet" href="src/styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="header-title">Decision Intelligence</span>
+        <span id="data-badge" class="data-source-badge ds-demo">
+          <i class="ti ti-database"></i> Demo data
+        </span>
+      </div>
+      <div class="header-right">
+        <button class="btn-primary" onclick="document.getElementById('upload-trigger').click()">
+          <i class="ti ti-upload"></i> Upload Excel
+        </button>
+        <input type="file" id="upload-trigger" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])" />
+      </div>
+    </header>
+
+    <!-- Upload zone (shown after clicking upload or on first load) -->
+    <div id="upload-panel" class="upload-panel" style="display:none">
+      <div class="upload-zone" id="drop-zone"
+        onclick="document.getElementById('upload-trigger').click()"
+        ondragover="event.preventDefault(); this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="event.preventDefault(); this.classList.remove('drag'); handleFile(event.dataTransfer.files[0])">
+        <i class="ti ti-file-spreadsheet upload-icon"></i>
+        <div class="upload-title">Drop your sangeeta_template.xlsx here</div>
+        <div class="upload-sub">Reads full_data, attrition_analysis, trend_analysis, projections sheets</div>
+        <button class="btn-outline" onclick="event.stopPropagation(); document.getElementById('upload-trigger').click()">
+          <i class="ti ti-upload"></i> Choose file
+        </button>
+      </div>
+      <div id="status-msg" style="display:none"></div>
+    </div>
+
+    <!-- Navigation tabs -->
+    <nav class="dash-nav">
+      <button class="tab active" onclick="showPanel('overview', this)"><i class="ti ti-chart-bar"></i> Overview</button>
+      <button class="tab" onclick="showPanel('trend', this)"><i class="ti ti-calendar-stats"></i> Historical Trend</button>
+      <button class="tab" onclick="showPanel('portfolio', this)"><i class="ti ti-briefcase"></i> Portfolio</button>
+      <button class="tab" onclick="showPanel('forecast', this)"><i class="ti ti-trending-up"></i> ML Forecast</button>
+      <button class="tab" onclick="showPanel('attrition', this)"><i class="ti ti-user-minus"></i> Attrition</button>
+      <button class="tab" onclick="showPanel('ai', this)"><i class="ti ti-sparkles"></i> AI Insights</button>
+    </nav>
+
+    <main class="dash-main">
+
+      <!-- OVERVIEW -->
+      <section id="panel-overview" class="panel active">
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-users"></i> Headcount</div><div class="kpi-value" id="kpi-hc">—</div><div class="kpi-delta" id="kpi-hc-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-currency-dollar"></i> Annual revenue</div><div class="kpi-value" id="kpi-rev">—</div><div class="kpi-delta delta-up" id="kpi-rev-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-percentage"></i> Avg GM%</div><div class="kpi-value" id="kpi-gm">—</div><div class="kpi-delta" id="kpi-gm-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-coin"></i> Rev / resource</div><div class="kpi-value" id="kpi-rpr">—</div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-user-x"></i> Attrition est.</div><div class="kpi-value" id="kpi-attr">—</div><div class="kpi-delta delta-dn" id="kpi-attr-d"></div></div>
+        </div>
+        <div class="row-2">
+          <div class="card">
+            <div class="card-title">Revenue by role category</div>
+            <div class="legend">
+              <span><span class="leg-sq" style="background:#378ADD"></span>Engineer</span>
+              <span><span class="leg-sq" style="background:#1D9E75"></span>Analyst</span>
+              <span><span class="leg-sq" style="background:#BA7517"></span>PM</span>
+              <span><span class="leg-sq" style="background:#534AB7"></span>Other</span>
+            </div>
+            <div class="chart-wrap h200"><canvas id="c-role" role="img" aria-label="Revenue by role category">Revenue by role.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Monthly revenue run-rate (2026)</div>
+            <div class="legend">
+              <span><span class="leg-sq" style="background:#378ADD"></span>Revenue</span>
+              <span><span class="leg-sq" style="background:#1D9E75; opacity:.5"></span>Target</span>
+            </div>
+            <div class="chart-wrap h200"><canvas id="c-monthly" role="img" aria-label="Monthly revenue 2026">Monthly revenue.</canvas></div>
+          </div>
+        </div>
+        <div class="row-3">
+          <div class="card"><div class="card-title">GM% distribution</div><div class="chart-wrap h180"><canvas id="c-gm" role="img" aria-label="GM% histogram">GM% distribution.</canvas></div></div>
+          <div class="card"><div class="card-title">Headcount by visa</div><div class="chart-wrap h180"><canvas id="c-visa" role="img" aria-label="Visa status breakdown">Visa breakdown.</canvas></div></div>
+          <div class="card"><div class="card-title">Revenue by location</div><div class="chart-wrap h180"><canvas id="c-loc" role="img" aria-label="Revenue by location">Revenue by location.</canvas></div></div>
+        </div>
+      </section>
+
+      <!-- FORECAST -->
+      <section id="panel-forecast" class="panel">
+        <div class="scenario-bar">
+          <span class="section-label">Scenario</span>
+          <div class="scenario-btns">
+            <button class="sc-btn active" onclick="setScenario('base', this)">Base case</button>
+            <button class="sc-btn" onclick="setScenario('bull', this)">Bull case</button>
+            <button class="sc-btn" onclick="setScenario('bear', this)">Bear case</button>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">2026 projected revenue</div><div class="kpi-value" id="fc-26r">—</div></div>
+          <div class="kpi"><div class="kpi-label">2027 projected revenue</div><div class="kpi-value" id="fc-27r">—</div></div>
+          <div class="kpi"><div class="kpi-label">2028 projected revenue</div><div class="kpi-value" id="fc-28r">—</div></div>
+          <div class="kpi"><div class="kpi-label">3-yr CAGR</div><div class="kpi-value" id="fc-cagr">—</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Revenue forecast 2023–2028 with confidence band</div>
+          <div class="legend">
+            <span><span class="leg-sq" style="background:#378ADD"></span>Historic</span>
+            <span><span class="leg-sq" style="background:#1D9E75"></span>Projected</span>
+            <span><span class="leg-sq" style="background:#EAF3DE; border:1px solid #639922"></span>Confidence</span>
+          </div>
+          <div class="chart-wrap h240"><canvas id="c-forecast" role="img" aria-label="Revenue forecast chart">Forecast.</canvas></div>
+        </div>
+        <div class="row-2">
+          <div class="card"><div class="card-title">Headcount projection</div><div class="chart-wrap h180"><canvas id="c-hcfc" role="img" aria-label="Headcount forecast">HC forecast.</canvas></div></div>
+          <div class="card"><div class="card-title">Revenue per resource</div><div class="chart-wrap h180"><canvas id="c-rpr" role="img" aria-label="Revenue per resource trend">RPR trend.</canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Projection table (model output)</div>
+          <div style="overflow-x:auto">
+            <table class="proj-table">
+              <thead><tr><th>Metric</th><th>2025 (actual)</th><th>2026</th><th>2027</th><th>2028</th></tr></thead>
+              <tbody id="proj-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card transparency-card">
+          <details>
+            <summary class="transparency-summary">
+              <i class="ti ti-info-circle"></i>
+              <span>See formula used for calculation</span>
+              <i class="ti ti-chevron-down transparency-chevron"></i>
+            </summary>
+            <div class="transparency-body">
+
+              <h4>1. Historical baseline</h4>
+              <p>2025 is the live portfolio total from the loaded data. 2023 and 2024 are estimated from the 2025 base while real historical sheets are not yet wired in:</p>
+              <div class="transparency-formula">
+                2024 revenue ≈ 2025 revenue × 0.82<br>
+                2023 revenue ≈ 2025 revenue × 0.68
+              </div>
+              <p><strong>Where do 0.82 and 0.68 come from?</strong> They are not derived from your data — they are hardcoded round-number placeholders. Reverse-engineering what they imply:</p>
+              <ul>
+                <li><code>1 ÷ 0.82 ≈ 1.22</code> → an implied <strong>~22% YoY growth</strong> from 2024 to 2025</li>
+                <li><code>0.82 ÷ 0.68 ≈ 1.21</code> → another <strong>~21% YoY growth</strong> from 2023 to 2024</li>
+                <li><code>(1 ÷ 0.68)^(1/2) − 1 ≈ 21%</code> → historical CAGR baked into the chart</li>
+              </ul>
+              <p>So these multipliers encode a working assumption that the portfolio grew roughly 21–22% per year historically — slightly above the Base case's 18% forward growth. They were chosen as plausible round numbers, <strong>not fitted to any data</strong>.</p>
+              <p class="transparency-note">When the <code>trend_analysis</code> sheet parser is added, these will be replaced with actual reported numbers.</p>
+
+              <h4>2. Forward projection formula</h4>
+              <p>Revenue compounds year-on-year using scenario-specific growth rates that taper as the base grows:</p>
+              <div class="transparency-formula">
+                2026 = 2025 × (1 + g₁)<br>
+                2027 = 2026 × (1 + g₂)<br>
+                2028 = 2027 × (1 + g₃)
+              </div>
+              <p>Headcount projection uses the same compounding pattern with separate <code>hcGrowth</code> rates per scenario, then revenue-per-resource is derived as <code>revenue ÷ headcount</code> for each year.</p>
+
+              <h4>3. 3-year CAGR</h4>
+              <div class="transparency-formula">
+                CAGR = ( (2028 revenue ÷ 2025 revenue) ^ (1 ÷ 3) − 1 ) × 100%
+              </div>
+
+              <h4>4. Confidence band</h4>
+              <p>The shaded band around the projected line widens further out, reflecting growing uncertainty:</p>
+              <div class="transparency-formula">
+                upper bound = projection × (1 + 0.08 + i × 0.02)<br>
+                lower bound = projection × (1 − 0.06 − i × 0.015)
+              </div>
+              <p class="transparency-note">Where <code>i</code> = 0, 1, 2 for 2026, 2027, 2028. This is illustrative — not a statistical prediction interval.</p>
+
+              <h4>5. Scenario rationale &amp; rates</h4>
+              <div style="overflow-x:auto">
+                <table class="scenario-table">
+                  <thead>
+                    <tr><th>Scenario</th><th>2026</th><th>2027</th><th>2028</th><th>Headcount YoY</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td><strong>Base</strong></td><td>+18%</td><td>+15%</td><td>+12%</td><td>+20 / +12 / +10%</td></tr>
+                    <tr><td><strong>Bull</strong></td><td>+25%</td><td>+22%</td><td>+18%</td><td>+28 / +20 / +15%</td></tr>
+                    <tr><td><strong>Bear</strong></td><td>+8%</td><td>+6%</td><td>+5%</td><td>+5 / +4 / +3%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p><strong>Base case</strong> — assumes the current client pipeline holds, modest rate uplift on renewals, and normal attrition replaced in line with growth. Growth tapers from 18% to 12% as the larger revenue base makes the same dollar increment a smaller percentage.</p>
+
+              <p><strong>Bull case</strong> — assumes new client wins beyond the current pipeline, above-market rate increases on renewals (driven by skill scarcity), sub-10% attrition, and headcount expansion ahead of revenue to capture demand.</p>
+
+              <p><strong>Bear case</strong> — assumes pipeline weakness, downward rate pressure from client negotiations or vendor consolidation, elevated attrition with slow replacement, and a hiring freeze. Treat this as a conservative floor, not a worst case.</p>
+
+              <h4>6. Honest caveats</h4>
+              <ul>
+                <li>These growth rates are <strong>fixed assumptions</strong> in the code, not outputs of a fitted model.</li>
+                <li>The "ML Forecast" label reflects the intended direction of this panel, not the current implementation — there is no regression, time-series, or learning component yet.</li>
+                <li>To replace this with a real model: fit on historical revenue from <code>trend_analysis</code>, optionally include macro drivers (client headcount, billable rate index), and export coefficients for in-browser inference.</li>
+              </ul>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- ATTRITION -->
+      <section id="panel-attrition" class="panel">
+        <p class="section-intro" id="a-source-note">—</p>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-user-minus"></i> Attrition rate</div><div class="kpi-value" id="a-rate">—</div><div class="kpi-delta">historical avg</div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-user-check"></i> Retention rate</div><div class="kpi-value" id="a-ret">—</div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-currency-dollar"></i> Revenue at risk</div><div class="kpi-value" id="a-rev">—</div><div class="kpi-delta delta-dn">from attrition</div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-replace"></i> Replacement cost</div><div class="kpi-value" id="a-cost">—</div><div class="kpi-delta delta-dn">est. 0.5× salary</div></div>
+        </div>
+        <div class="row-2">
+          <div class="card">
+            <div class="card-title">Attrition trend (2023–2025)</div>
+            <div class="legend"><span><span class="leg-sq" style="background:#E24B4A"></span>Attrition</span><span><span class="leg-sq" style="background:#1D9E75"></span>Retention</span></div>
+            <div class="chart-wrap h200"><canvas id="c-attr-trend" role="img" aria-label="Attrition trend">Attrition trend.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Attrition by role</div>
+            <div class="chart-wrap h200"><canvas id="c-attr-role" role="img" aria-label="Attrition by role">Attrition by role.</canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Attrition risk — employee view</div>
+          <div style="overflow-x:auto">
+            <table class="emp-table">
+              <thead><tr><th>Employee</th><th>Role</th><th>Months</th><th>Annual rev</th><th>GM%</th><th>Risk score</th><th>Signal</th></tr></thead>
+              <tbody id="risk-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">ML feature importance — attrition drivers</div>
+          <div class="chart-wrap h180"><canvas id="c-feat" role="img" aria-label="Feature importance">Feature importance.</canvas></div>
+        </div>
+      </section>
+
+      <!-- PORTFOLIO -->
+      <section id="panel-portfolio" class="panel">
+        <div class="filter-bar">
+          <select id="filter-client" onchange="renderPortfolio()"><option value="">All clients</option></select>
+          <select id="filter-role" onchange="renderPortfolio()"><option value="">All roles</option></select>
+          <select id="sort-by" onchange="renderPortfolio()">
+            <option value="rev">Sort: Revenue ↓</option>
+            <option value="gm">Sort: GM% ↓</option>
+            <option value="tenure">Sort: Tenure ↓</option>
+          </select>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Showing</div><div class="kpi-value" id="pf-count">—</div></div>
+          <div class="kpi"><div class="kpi-label">Total revenue</div><div class="kpi-value" id="pf-rev">—</div></div>
+          <div class="kpi"><div class="kpi-label">Total margin</div><div class="kpi-value" id="pf-margin">—</div></div>
+          <div class="kpi"><div class="kpi-label">Avg GM%</div><div class="kpi-value" id="pf-gm">—</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Revenue vs GM% — bubble size = tenure</div>
+          <div class="chart-wrap h240"><canvas id="c-bubble" role="img" aria-label="Bubble chart revenue vs GM%">Bubble chart.</canvas></div>
+        </div>
+        <div class="card" style="overflow-x:auto">
+          <div class="card-title">Placement register</div>
+          <table class="emp-table">
+            <thead><tr><th>Employee</th><th>Client</th><th>Role</th><th>Location</th><th>Tenure</th><th>Annual rev</th><th>GM%</th><th>Health</th></tr></thead>
+            <tbody id="pf-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- HISTORICAL TREND -->
+      <section id="panel-trend" class="panel">
+        <p class="section-intro">Year-over-year performance across 2023–2025. Year filter focuses the KPIs and breakdown; comparison charts always show all three years.</p>
+        <div class="filter-bar">
+          <select id="tr-year" onchange="renderTrend()">
+            <option value="">All years (2023–2025)</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025" selected>2025</option>
+          </select>
+          <select id="tr-client" onchange="renderTrend()"><option value="">All clients</option></select>
+          <select id="tr-role" onchange="renderTrend()"><option value="">All roles</option></select>
+          <select id="tr-loc" onchange="renderTrend()"><option value="">All locations</option></select>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-users"></i> Headcount</div><div class="kpi-value" id="tr-hc">—</div><div class="kpi-delta" id="tr-hc-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-currency-dollar"></i> Revenue</div><div class="kpi-value" id="tr-rev">—</div><div class="kpi-delta" id="tr-rev-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-coin"></i> Margin</div><div class="kpi-value" id="tr-margin">—</div><div class="kpi-delta" id="tr-margin-d"></div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-percentage"></i> Avg GM%</div><div class="kpi-value" id="tr-gm">—</div></div>
+          <div class="kpi"><div class="kpi-label"><i class="ti ti-trending-up"></i> YoY revenue growth</div><div class="kpi-value" id="tr-yoy">—</div><div class="kpi-delta" id="tr-yoy-d"></div></div>
+        </div>
+        <div class="row-2">
+          <div class="card">
+            <div class="card-title">Revenue &amp; margin by year</div>
+            <div class="legend">
+              <span><span class="leg-sq" style="background:#378ADD"></span>Revenue</span>
+              <span><span class="leg-sq" style="background:#1D9E75"></span>Margin</span>
+            </div>
+            <div class="chart-wrap h240"><canvas id="c-tr-rev" role="img" aria-label="Revenue and margin by year">Revenue &amp; margin trend.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Headcount by year</div>
+            <div class="chart-wrap h240"><canvas id="c-tr-hc" role="img" aria-label="Headcount by year">Headcount trend.</canvas></div>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="card">
+            <div class="card-title">Revenue by client across years</div>
+            <div class="chart-wrap h240"><canvas id="c-tr-client" role="img" aria-label="Revenue by client across years">Revenue by client.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Revenue by role across years</div>
+            <div class="chart-wrap h240"><canvas id="c-tr-role" role="img" aria-label="Revenue by role across years">Revenue by role.</canvas></div>
+          </div>
+        </div>
+        <div class="card" style="overflow-x:auto">
+          <div class="card-title">Year-by-year breakdown</div>
+          <table class="emp-table">
+            <thead><tr><th>Year</th><th>Headcount</th><th>Revenue</th><th>Margin</th><th>GM%</th><th>YoY growth</th></tr></thead>
+            <tbody id="tr-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- AI INSIGHTS -->
+      <section id="panel-ai" class="panel">
+        <div class="card">
+          <div class="ai-label"><i class="ti ti-sparkles"></i> AI analysis — powered by Claude</div>
+          <!-- ⚠️ Add your Anthropic API key to src/config.js -->
+          <div class="ai-actions">
+            <button class="btn-outline" onclick="runAI('summary')"><i class="ti ti-chart-bar"></i> Portfolio summary</button>
+            <button class="btn-outline" onclick="runAI('attrition')"><i class="ti ti-user-minus"></i> Attrition analysis</button>
+            <button class="btn-outline" onclick="runAI('forecast')"><i class="ti ti-trending-up"></i> Forecast rationale</button>
+            <button class="btn-outline" onclick="runAI('actions')"><i class="ti ti-checklist"></i> Top 3 actions</button>
+          </div>
+          <div id="ai-status" style="display:none" class="status-bar status-loading">
+            <span class="spinner"></span><span id="ai-status-text">Analysing your data...</span>
+          </div>
+          <div id="ai-output" class="ai-insight" style="display:none"></div>
+        </div>
+        <div class="card">
+          <div class="ai-label"><i class="ti ti-message"></i> Ask about your data</div>
+          <div class="ask-row">
+            <input type="text" id="ai-question" placeholder="e.g. Which client has the highest revenue at risk?" onkeydown="if(event.key==='Enter') askAI()" />
+            <button class="btn-primary" onclick="askAI()"><i class="ti ti-send"></i> Ask</button>
+          </div>
+          <div id="ai-q-status" style="display:none; margin-top:10px" class="status-bar status-loading"><span class="spinner"></span><span>Thinking...</span></div>
+          <div id="ai-q-output" class="ai-insight" style="display:none; margin-top:10px"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="src/data.js"></script>
+  <script src="src/config.js"></script>
+  <script src="src/charts.js"></script>
+  <script src="src/dashboard.js"></script>
+</body>
+</html>
