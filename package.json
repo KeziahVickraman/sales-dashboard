@@ -1,0 +1,24 @@
+{
+  "name": "sales_dashboard_new",
+  "version": "1.0.0",
+  "description": "A fully self-contained, browser-based decision intelligence dashboard for your staffing/sales team. No build step required — open `index.html` directly in a browser or serve with any static file server.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KeziahVickraman/sales-dashboard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/KeziahVickraman/sales-dashboard/issues"
+  },
+  "homepage": "https://github.com/KeziahVickraman/sales-dashboard#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

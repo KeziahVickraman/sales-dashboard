@@ -623,12 +623,9 @@ const AI_PROMPTS = {
 };
 
 async function callClaude(userContent) {
-  if (!CONFIG.ANTHROPIC_API_KEY || CONFIG.ANTHROPIC_API_KEY === 'YOUR_API_KEY_HERE') {
-    throw new Error('API key not set. Edit src/config.js and add your Anthropic API key.');
-  }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/api/claude', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: CONFIG.MODEL,
       max_tokens: CONFIG.MAX_TOKENS,
