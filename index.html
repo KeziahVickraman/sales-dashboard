@@ -484,9 +484,40 @@
         <div class="card" style="overflow-x:auto">
           <div class="card-title">Placement register</div>
           <table class="emp-table">
-            <thead><tr><th>Employee</th><th>Client</th><th>Role</th><th>Location</th><th>Tenure</th><th>Annual rev</th><th>GM%</th><th>Health</th></tr></thead>
+            <thead><tr><th>Employee</th><th>Client</th><th>Role</th><th>Location</th><th>Tenure</th><th>Annual rev</th><th>GM%</th><th>Health *</th></tr></thead>
             <tbody id="pf-tbody"></tbody>
           </table>
+        </div>
+
+        <div class="card transparency-card">
+          <details>
+            <summary class="transparency-summary">
+              <i class="ti ti-info-circle"></i>
+              <span>See how health is calculated</span>
+              <i class="ti ti-chevron-down transparency-chevron"></i>
+            </summary>
+            <div class="transparency-body">
+              <h4>Health rating</h4>
+              <p>Each placement is assigned a health rating based entirely on its gross margin percentage (GM%). GM% measures how much of the billed revenue is retained as profit after paying the employee's cost-to-company.</p>
+              <div class="transparency-formula">
+                GM% = (Annual revenue − Annual CTC) ÷ Annual revenue × 100
+              </div>
+              <h4>Rating thresholds</h4>
+              <div style="overflow-x:auto">
+                <table class="scenario-table">
+                  <thead>
+                    <tr><th>Rating</th><th>GM% range</th><th>What it means</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td><span class="badge badge-green">High margin</span></td><td>GM% ≥ 18%</td><td>Strong profitability — above target. Placement is performing well commercially.</td></tr>
+                    <tr><td><span class="badge badge-blue">Healthy</span></td><td>13% ≤ GM% &lt; 18%</td><td>Acceptable margin — within the normal range. No immediate commercial concern.</td></tr>
+                    <tr><td><span class="badge badge-amber">Watch</span></td><td>GM% &lt; 13%</td><td>Below the healthy threshold. May indicate rate pressure, high cost, or a contract requiring renegotiation.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="transparency-note">The 13% and 18% thresholds are fixed reference points in the current model. They are not dynamically derived from your portfolio — they represent business targets set for this dashboard. A placement rated <strong>Watch</strong> is not necessarily unprofitable, but it warrants a closer look at the billing rate or cost structure.</p>
+            </div>
+          </details>
         </div>
       </section>
 
