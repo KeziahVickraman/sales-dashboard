@@ -1,7 +1,7 @@
 ﻿// Vercel Serverless Function — replaces src/server.js Express proxy
 // Vercel automatically exposes this as POST /api/claude
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: { message: 'Method not allowed' } });
   }
