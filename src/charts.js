@@ -26,11 +26,11 @@ function fmt(n) {
 
 // ── Overview charts ──────────────────────────────────────────────────────────
 
-function renderRoleRevenueChart(data) {
+function renderRoleRevenueChart(data, targetId) {
   const roles = {};
   data.forEach(e => { roles[e.role] = (roles[e.role] || 0) + e.annualRev; });
   const keys = Object.keys(roles);
-  mkChart('c-role', {
+  mkChart(targetId || 'c-role', {
     type: 'bar',
     data: {
       labels: keys,
@@ -49,7 +49,7 @@ function renderRoleRevenueChart(data) {
   });
 }
 
-function renderMonthlyChart(data) {
+function renderMonthlyChart(data, targetId) {
   const months = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   // Per-month revenue = Σ (days_worked × daily_rate) across employees
@@ -61,7 +61,7 @@ function renderMonthlyChart(data) {
   const avg = mRevs.reduce((a, b) => a + b, 0) / months.length;
   const target = Math.round(avg * 1.08) || 0;
 
-  mkChart('c-monthly', {
+  mkChart(targetId || 'c-monthly', {
     type: 'line',
     data: {
       labels: months,
@@ -81,7 +81,7 @@ function renderMonthlyChart(data) {
   });
 }
 
-function renderGMHistogram(data) {
+function renderGMHistogram(data, targetId) {
   const buckets = ['<10%', '10–15%', '15–20%', '>20%'];
   const counts = [0, 0, 0, 0];
   data.forEach(e => {
@@ -90,27 +90,27 @@ function renderGMHistogram(data) {
     else if (e.gm < 20) counts[2]++;
     else counts[3]++;
   });
-  mkChart('c-gm', {
+  mkChart(targetId || 'c-gm', {
     type: 'bar',
     data: { labels: buckets, datasets: [{ data: counts, backgroundColor: ['#E24B4A', '#378ADD', '#1D9E75', '#27500A'], borderRadius: 4 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { stepSize: 1 } } } },
   });
 }
 
-function renderVisaChart(data) {
+function renderVisaChart(data, targetId) {
   const visas = {};
   data.forEach(e => { visas[e.visa] = (visas[e.visa] || 0) + 1; });
-  mkChart('c-visa', {
+  mkChart(targetId || 'c-visa', {
     type: 'doughnut',
     data: { labels: Object.keys(visas), datasets: [{ data: Object.values(visas), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } } },
   });
 }
 
-function renderLocationChart(data) {
+function renderLocationChart(data, targetId) {
   const locs = {};
   data.forEach(e => { locs[e.loc] = (locs[e.loc] || 0) + e.annualRev; });
-  mkChart('c-loc', {
+  mkChart(targetId || 'c-loc', {
     type: 'doughnut',
     data: { labels: Object.keys(locs), datasets: [{ data: Object.values(locs), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } } },

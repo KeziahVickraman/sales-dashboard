@@ -13,11 +13,21 @@ let ATTRITION_DATA = null; // populated from attrition_analysis sheet when prese
 let isLiveData = false;
 let currentScenario = 'base';
 
-const SCENARIOS = {
+// Scenarios are mutable so users can edit YoY revenue growth rates from
+// the Forecast panel. Headcount growth (hcGrowth) stays fixed for now.
+let SCENARIOS = {
   base: { growth: [0.18, 0.15, 0.12], hcGrowth: [0.20, 0.12, 0.10] },
   bull: { growth: [0.25, 0.22, 0.18], hcGrowth: [0.28, 0.20, 0.15] },
   bear: { growth: [0.08, 0.06, 0.05], hcGrowth: [0.05, 0.04, 0.03] },
 };
+
+// Deltas (in percentage points) used by "Suggest from base"
+const SUGGEST_DELTAS = {
+  bull: [ +7, +7, +6],
+  bear: [-10, -9, -7],
+};
+
+let _rateInputsSynced = false;
 
 // ── Utility ──────────────────────────────────────────────────────────────────
 
@@ -128,7 +138,47 @@ function setScenario(s, btn) {
   renderForecast();
 }
 
+/** Format a multiplier (0.18) as a percentage string for an input ("18" or "18.5") */
+function fmtRatePct(r) {
+  const v = +(r * 100).toFixed(1);
+  return Number.isInteger(v) ? String(v) : String(v);
+}
+
+/** Push current SCENARIOS values into the editable rate inputs */
+function syncRateInputsFromScenarios() {
+  ['base', 'bull', 'bear'].forEach(sc => {
+    for (let i = 0; i < 3; i++) {
+      const inp = el(`r-${sc}-${i}`);
+      if (inp) inp.value = fmtRatePct(SCENARIOS[sc].growth[i]);
+    }
+  });
+}
+
+/** Called from rate input onchange — updates SCENARIOS and re-renders */
+function updateRate(scenario, idx, inputEl) {
+  const pct = parseFloat(inputEl.value);
+  if (!isFinite(pct)) return;
+  SCENARIOS[scenario].growth[idx] = pct / 100;
+  renderForecast();
+}
+
+/** Fill bull or bear from base ± fixed deltas (per-year, clamped at 0) */
+function suggestFromBase(scenario) {
+  const deltas = SUGGEST_DELTAS[scenario];
+  if (!deltas) return;
+  const baseGrowth = SCENARIOS.base.growth;
+  SCENARIOS[scenario].growth = baseGrowth.map((g, i) =>
+    Math.max(0, g * 100 + deltas[i]) / 100
+  );
+  syncRateInputsFromScenarios();
+  renderForecast();
+}
+
 function renderForecast() {
+  if (!_rateInputsSynced) {
+    syncRateInputsFromScenarios();
+    _rateInputsSynced = true;
+  }
   const sc          = SCENARIOS[currentScenario];
   const base2025Rev = DATA.reduce((s, e) => s + e.annualRev, 0);
   const base2025HC  = DATA.length;
@@ -424,6 +474,37 @@ function renderTrend() {
   }).join('');
 }
 
+// ── Chart fullscreen modal ───────────────────────────────────────────────────
+
+/** Maps each Overview canvas ID to a function that renders it into a target ID */
+const FS_CHART_MAP = {
+  'c-role':    () => renderRoleRevenueChart(DATA, 'c-fs-canvas'),
+  'c-monthly': () => renderMonthlyChart(DATA,     'c-fs-canvas'),
+  'c-gm':      () => renderGMHistogram(DATA,      'c-fs-canvas'),
+  'c-visa':    () => renderVisaChart(DATA,         'c-fs-canvas'),
+  'c-loc':     () => renderLocationChart(DATA,     'c-fs-canvas'),
+};
+
+function openChartFullscreen(canvasId, title) {
+  const renderer = FS_CHART_MAP[canvasId];
+  if (!renderer) return;
+  el('chart-modal-title').textContent = title;
+  el('chart-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // requestAnimationFrame ensures the modal is visible before Chart.js measures its canvas
+  requestAnimationFrame(() => renderer());
+}
+
+function closeChartFullscreen() {
+  const fsCanvas = el('c-fs-canvas');
+  if (fsCanvas) {
+    const fsChart = Chart.getChart(fsCanvas);
+    if (fsChart) fsChart.destroy();
+  }
+  el('chart-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
 // ── AI Insights ──────────────────────────────────────────────────────────────
 
 /** Build a compact plain-text summary of the current data for the AI prompt */
@@ -531,4 +612,8 @@ async function askAI() {
   initOverview();
   resetFilters();
   renderPortfolio();
+  // Close fullscreen modal on Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeChartFullscreen();
+  });
 })();

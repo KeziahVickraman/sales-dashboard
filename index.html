@@ -14,7 +14,7 @@
   <div class="app">
     <header class="app-header">
       <div class="header-left">
-        <span class="header-title">Decision Intelligence</span>
+        <span class="header-title">UNISON GROUP | Sales Decision Intelligence</span>
         <span id="data-badge" class="data-source-badge ds-demo">
           <i class="ti ti-database"></i> Demo data
         </span>
@@ -67,7 +67,10 @@
         </div>
         <div class="row-2">
           <div class="card">
-            <div class="card-title">Revenue by role category</div>
+            <div class="card-title-row">
+              <span class="card-title">Revenue by role category</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-role','Revenue by role category')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="legend">
               <span><span class="leg-sq" style="background:#378ADD"></span>Engineer</span>
               <span><span class="leg-sq" style="background:#1D9E75"></span>Analyst</span>
@@ -77,7 +80,10 @@
             <div class="chart-wrap h200"><canvas id="c-role" role="img" aria-label="Revenue by role category">Revenue by role.</canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Monthly revenue run-rate (2026)</div>
+            <div class="card-title-row">
+              <span class="card-title">Monthly revenue run-rate (2026)</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-monthly','Monthly revenue run-rate (2026)')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="legend">
               <span><span class="leg-sq" style="background:#378ADD"></span>Revenue</span>
               <span><span class="leg-sq" style="background:#1D9E75; opacity:.5"></span>Target</span>
@@ -86,9 +92,27 @@
           </div>
         </div>
         <div class="row-3">
-          <div class="card"><div class="card-title">GM% distribution</div><div class="chart-wrap h180"><canvas id="c-gm" role="img" aria-label="GM% histogram">GM% distribution.</canvas></div></div>
-          <div class="card"><div class="card-title">Headcount by visa</div><div class="chart-wrap h180"><canvas id="c-visa" role="img" aria-label="Visa status breakdown">Visa breakdown.</canvas></div></div>
-          <div class="card"><div class="card-title">Revenue by location</div><div class="chart-wrap h180"><canvas id="c-loc" role="img" aria-label="Revenue by location">Revenue by location.</canvas></div></div>
+          <div class="card">
+            <div class="card-title-row">
+              <span class="card-title">GM% distribution</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-gm','GM% distribution')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
+            <div class="chart-wrap h180"><canvas id="c-gm" role="img" aria-label="GM% histogram">GM% distribution.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title-row">
+              <span class="card-title">Headcount by visa</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-visa','Headcount by visa')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
+            <div class="chart-wrap h180"><canvas id="c-visa" role="img" aria-label="Visa status breakdown">Visa breakdown.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title-row">
+              <span class="card-title">Revenue by location</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-loc','Revenue by location')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
+            <div class="chart-wrap h180"><canvas id="c-loc" role="img" aria-label="Revenue by location">Revenue by location.</canvas></div>
+          </div>
         </div>
       </section>
 
@@ -102,6 +126,48 @@
             <button class="sc-btn" onclick="setScenario('bear', this)">Bear case</button>
           </div>
         </div>
+
+        <div class="card">
+          <div class="card-title">Growth rate assumptions — YoY revenue % (editable)</div>
+          <div style="overflow-x:auto">
+            <table class="rates-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>2026</th>
+                  <th>2027</th>
+                  <th>2028</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Base</strong></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-base-0" step="0.5" onchange="updateRate('base', 0, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-base-1" step="0.5" onchange="updateRate('base', 1, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-base-2" step="0.5" onchange="updateRate('base', 2, this)" /><span class="rate-pct">%</span></span></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td><strong>Bull</strong></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-0" step="0.5" onchange="updateRate('bull', 0, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-1" step="0.5" onchange="updateRate('bull', 1, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-2" step="0.5" onchange="updateRate('bull', 2, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><button class="btn-suggest" onclick="suggestFromBase('bull')" title="Suggested = base + 7 / +7 / +6">Suggest from base</button></td>
+                </tr>
+                <tr>
+                  <td><strong>Bear</strong></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-0" step="0.5" onchange="updateRate('bear', 0, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-1" step="0.5" onchange="updateRate('bear', 1, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-2" step="0.5" onchange="updateRate('bear', 2, this)" /><span class="rate-pct">%</span></span></td>
+                  <td><button class="btn-suggest" onclick="suggestFromBase('bear')" title="Suggested = base − 10 / −9 / −7 (clamped at 0)">Suggest from base</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="section-intro" style="margin-top:10px; margin-bottom:0">Edit any cell to update the projection. Headcount growth rates remain fixed (Base 20/12/10%, Bull 28/20/15%, Bear 5/4/3%).</p>
+        </div>
+
         <div class="kpi-grid">
           <div class="kpi"><div class="kpi-label">2026 projected revenue</div><div class="kpi-value" id="fc-26r">—</div></div>
           <div class="kpi"><div class="kpi-label">2027 projected revenue</div><div class="kpi-value" id="fc-27r">—</div></div>
@@ -353,6 +419,23 @@
           <div id="ai-q-output" class="ai-insight" style="display:none; margin-top:10px"></div>
         </div>
       </section>
+
+      <!-- Chart fullscreen modal -->
+      <div id="chart-modal" class="chart-modal-overlay" onclick="if(event.target===this)closeChartFullscreen()" style="display:none">
+        <div class="chart-modal-inner">
+          <div class="chart-modal-header">
+            <span id="chart-modal-title" class="chart-modal-title"></span>
+            <button class="chart-modal-close" onclick="closeChartFullscreen()" title="Close (Esc)">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <div class="chart-modal-body">
+            <div class="chart-modal-canvas-wrap">
+              <canvas id="c-fs-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </main>
   </div>
