@@ -808,6 +808,13 @@ const AI_PROMPTS = {
   actions:   'You are a sales and retention strategist. Give exactly 3 specific, numbered, actionable recommendations for this team to prioritise in the next 90 days. For each: state the action, the expected impact, and how to measure success. Keep it tight and practical.',
 };
 
+const AI_PROMPT_LABELS = {
+  summary:   'Portfolio Summary',
+  attrition: 'Attrition Analysis',
+  forecast:  'Forecast Rationale',
+  actions:   'Top 3 Actions',
+};
+
 async function callClaude(userContent) {
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -820,7 +827,12 @@ async function callClaude(userContent) {
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  return {
+    text,
+    usage: data.usage || { input_tokens: 0, output_tokens: 0 },
+    model: data.model || CONFIG.MODEL,
+  };
 }
 
 async function runAI(type) {
@@ -833,9 +845,10 @@ async function runAI(type) {
 
   try {
     const summary = buildDataSummary();
-    const text    = await callClaude(AI_PROMPTS[type] + '\n\nData:\n' + summary);
+    const { text, usage, model } = await callClaude(AI_PROMPTS[type] + '\n\nData:\n' + summary);
     outputEl.textContent = text;
     outputEl.style.display = 'block';
+    recordUsage(AI_PROMPT_LABELS[type], usage, model);
     statusEl.style.display = 'none';
   } catch (err) {
     statusEl.className = 'status-bar status-error';
@@ -856,9 +869,10 @@ async function askAI() {
   try {
     const summary = buildDataSummary();
     const prompt  = `You are a staffing business analyst. Answer this question about the portfolio concisely and specifically. Use only the data provided.\n\nQuestion: "${q}"\n\nData:\n${summary}`;
-    const text    = await callClaude(prompt);
+    const { text, usage, model } = await callClaude(prompt);
     outputEl.textContent = text;
     outputEl.style.display = 'block';
+    recordUsage('Q: ' + q.slice(0, 40) + (q.length > 40 ? '…' : ''), usage, model);
     statusEl.style.display = 'none';
   } catch (err) {
     statusEl.className = 'status-bar status-error';
@@ -1048,12 +1062,169 @@ function showDeckStatus(msg, type) {
   statusEl.innerHTML = `${icon}<span>${escapeHTML(msg)}</span>`;
 }
 
+// ── Token usage tracking ──────────────────────────────────────────────────────
+const SESSION_USAGE = [];   // array of call records, grows through the session
+
+const PRICING = {
+  'claude-sonnet-4-20250514':  { input: 3.00,  output: 15.00 },
+  'claude-opus-4-20250514':    { input: 15.00, output: 75.00 },
+  'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.00  },
+};
+const DEFAULT_PRICE = { input: 3.00, output: 15.00 };
+
+let sessionBudgetUSD = 1.00;   // default $1.00 cap, user can change
+
+function recordUsage(label, usage, model) {
+  const price = PRICING[model] || DEFAULT_PRICE;
+  const cost  = (usage.input_tokens  / 1_000_000 * price.input)
+              + (usage.output_tokens / 1_000_000 * price.output);
+  SESSION_USAGE.push({
+    label,
+    model,
+    inputTokens:  usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    cost,
+    timestamp: new Date(),
+  });
+  renderUsageTracker();
+  checkBudgetWarning();
+}
+
+function sessionTotals() {
+  return SESSION_USAGE.reduce(
+    (acc, r) => ({
+      inputTokens:  acc.inputTokens  + r.inputTokens,
+      outputTokens: acc.outputTokens + r.outputTokens,
+      cost:         acc.cost         + r.cost,
+      calls:        acc.calls        + 1,
+    }),
+    { inputTokens: 0, outputTokens: 0, cost: 0, calls: 0 }
+  );
+}
+
+function renderUsageTracker() {
+  const totals = sessionTotals();
+  const pct    = Math.min(totals.cost / sessionBudgetUSD * 100, 100);
+
+  // Header summary (collapsed view)
+  el('usage-header-summary').textContent =
+    totals.calls > 0
+      ? `${totals.calls} call${totals.calls > 1 ? 's' : ''} · $${totals.cost.toFixed(4)}`
+      : 'No calls yet';
+
+  // Live badge
+  el('usage-live-badge').style.display = totals.calls > 0 ? 'inline-flex' : 'none';
+
+  // KPIs
+  el('u-calls').textContent  = totals.calls;
+  el('u-input').textContent  = totals.inputTokens.toLocaleString();
+  el('u-output').textContent = totals.outputTokens.toLocaleString();
+  el('u-total').textContent  = (totals.inputTokens + totals.outputTokens).toLocaleString();
+  el('u-cost').textContent   = '$' + totals.cost.toFixed(4);
+
+  // Progress bar
+  const fill = el('usage-progress-fill');
+  fill.style.width = pct + '%';
+  fill.className = 'usage-progress-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
+  el('usage-progress-spent').textContent     = `$${totals.cost.toFixed(4)} spent`;
+  el('usage-progress-remaining').textContent = `$${sessionBudgetUSD.toFixed(2)} cap`;
+
+  // Empty state vs log
+  el('usage-empty').style.display      = totals.calls === 0 ? 'block' : 'none';
+  el('usage-log-wrap').style.display   = totals.calls > 0  ? 'block' : 'none';
+  el('usage-reset-wrap').style.display = totals.calls > 0  ? 'block' : 'none';
+
+  // Log table
+  const tbody = el('usage-log-tbody');
+  tbody.innerHTML = [...SESSION_USAGE].reverse().map(r => {
+    const time = r.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `<tr>
+      <td style="font-size:11px; color:var(--color-text-secondary)">${time}</td>
+      <td>${escapeHTML(r.label)}</td>
+      <td style="font-size:11px; color:var(--color-text-secondary)">${escapeHTML(r.model.replace('claude-','').replace(/-\d{8}$/,''))}</td>
+      <td style="text-align:right">${r.inputTokens.toLocaleString()}</td>
+      <td style="text-align:right">${r.outputTokens.toLocaleString()}</td>
+      <td style="text-align:right; font-weight:500; color:#1D9E75">$${r.cost.toFixed(4)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function checkBudgetWarning() {
+  const totals  = sessionTotals();
+  const pct     = totals.cost / sessionBudgetUSD * 100;
+  const warning = el('usage-warning');
+  if (pct >= 100) {
+    warning.style.display = 'flex';
+    warning.className = 'usage-warning danger';
+    el('usage-warning-text').textContent =
+      `Budget cap of $${sessionBudgetUSD.toFixed(2)} reached. Further calls will still work but costs are accumulating.`;
+  } else if (pct >= 80) {
+    warning.style.display = 'flex';
+    warning.className = 'usage-warning';
+    el('usage-warning-text').textContent =
+      `${Math.round(pct)}% of your $${sessionBudgetUSD.toFixed(2)} session budget used — $${(sessionBudgetUSD - totals.cost).toFixed(4)} remaining.`;
+  } else {
+    warning.style.display = 'none';
+  }
+}
+
+function updateBudget(val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v > 0) {
+    sessionBudgetUSD = v;
+    renderUsageTracker();
+    checkBudgetWarning();
+  }
+}
+
+function toggleUsagePanel() {
+  const body    = el('usage-panel-body');
+  const chevron = el('usage-chevron');
+  const btn     = el('usage-collapse-btn');
+  const isOpen  = body.style.display !== 'none';
+  body.style.display    = isOpen ? 'none' : 'block';
+  chevron.classList.toggle('collapsed', isOpen);
+  btn.setAttribute('aria-expanded', String(!isOpen));
+}
+
+function resetUsage() {
+  SESSION_USAGE.length = 0;
+  renderUsageTracker();
+  el('usage-warning').style.display = 'none';
+}
+
+function exportUsageCSV() {
+  const totals = sessionTotals();
+  const rows   = [
+    ['Time', 'Action', 'Model', 'Input Tokens', 'Output Tokens', 'Cost (USD)'],
+    ...SESSION_USAGE.map(r => [
+      r.timestamp.toISOString(),
+      r.label,
+      r.model,
+      r.inputTokens,
+      r.outputTokens,
+      r.cost.toFixed(6),
+    ]),
+    [],
+    ['TOTAL', '', '', totals.inputTokens, totals.outputTokens, totals.cost.toFixed(6)],
+  ];
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `dashboard-usage-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 (function init() {
   initOverview();
   resetFilters();
   renderPortfolio();
   initDeckGenerator();
+  renderUsageTracker();
   // Close fullscreen modal on Escape key
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeChartFullscreen();
