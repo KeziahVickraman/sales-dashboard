@@ -754,6 +754,19 @@ input[type="range"] { flex: 1; cursor: pointer; }
   height: 100%;
 }
 
+/* ── User Manual ── */
+.user-manual-card {
+  border-color: rgba(83,74,183,0.30);
+  background: rgba(83,74,183,0.04);
+  margin-bottom: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  .user-manual-card {
+    border-color: rgba(83,74,183,0.48);
+    background: rgba(83,74,183,0.10);
+  }
+}
+
 /* ── Spinner ── */
 .spinner {
   display: inline-block;

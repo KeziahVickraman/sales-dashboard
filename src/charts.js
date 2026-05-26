@@ -279,30 +279,6 @@ function renderFeatureImportanceChart() {
   });
 }
 
-// ── Decision engine chart ────────────────────────────────────────────────────
-
-function renderDecisionChart(cr, cp, lift) {
-  const pts = Array.from({ length: 51 }, (_, i) => i / 50);
-  mkChart('c-decision', {
-    type: 'line',
-    data: {
-      labels: pts.map(v => Math.round(v * 100) + '%'),
-      datasets: [
-        { label: 'Do nothing',    data: pts.map(v => v * cr),                borderColor: '#E24B4A', borderWidth: 2, tension: 0, pointRadius: 0, fill: false },
-        { label: 'Offer package', data: pts.map(v => cp + (v - lift * v) * cr), borderColor: '#1D9E75', borderWidth: 2, tension: 0, pointRadius: 0, fill: false },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 6, font: { size: 11 } } },
-        y: { ticks: { callback: v => fmt(v) } },
-      },
-    },
-  });
-}
-
 // ── Historical trend charts ──────────────────────────────────────────────────
 
 function renderTrendRevenueChart(perYear) {

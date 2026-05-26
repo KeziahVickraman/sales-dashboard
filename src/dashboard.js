@@ -61,7 +61,6 @@ function showPanel(id, btn) {
   if (id === 'forecast')  renderForecast();
   if (id === 'attrition-analysis') renderAttritionAnalysis();
   if (id === 'attrition') renderAttrition();
-  if (id === 'decision')  updateDecision();
   if (id === 'portfolio') renderPortfolio();
   if (id === 'trend')     renderTrend();
 }
@@ -368,53 +367,6 @@ function renderAttritionAnalysis() {
   }
 }
 
-// ── Decision Engine ──────────────────────────────────────────────────────────
-function updateDecision() {
-  const p    = parseInt(el('sl-p').value) / 100;
-  const cr   = parseInt(el('sl-cr').value);
-  const cp   = parseInt(el('sl-cp').value);
-  const lift = parseInt(el('sl-lift').value) / 100;
-
-  el('out-p').textContent    = Math.round(p * 100) + '%';
-  el('out-cr').textContent   = fmt(cr);
-  el('out-cp').textContent   = fmt(cp);
-  el('out-lift').textContent = Math.round(lift * 100) + '%';
-
-  const costNothing = p * cr;
-  const costOffer   = cp + (p - lift * p) * cr;
-  const pStar       = lift > 0 ? cp / (cr * lift) : 1;
-  const savings     = costNothing - costOffer;
-
-  el('dec-nothing').textContent    = fmt(costNothing);
-  el('dec-offer-cost').textContent = fmt(costOffer);
-  el('dec-pstar').textContent      = Math.round(pStar * 100) + '%';
-  el('dec-savings').textContent    = (savings > 0 ? '+' : '') + fmt(savings);
-
-  el('formula-out').textContent =
-    `Offer iff p > C_package / (C_replace × lift)  =  ${fmt(cp)} / (${fmt(cr)} × ${Math.round(lift * 100)}%)  =  ${Math.round(pStar * 100)}%`;
-
-  const box   = el('decision-result');
-  const title = el('dec-title');
-  const sub   = el('dec-sub');
-  box.className = 'decision-box';
-
-  if (p > pStar) {
-    box.classList.add('decision-offer');
-    title.textContent = 'Offer the retention package';
-    sub.textContent   = `p (${Math.round(p * 100)}%) exceeds break-even p* (${Math.round(pStar * 100)}%). Expected net saving: ${fmt(savings)}.`;
-  } else if (p > pStar * 0.85) {
-    box.classList.add('decision-hold');
-    title.textContent = 'Borderline — review carefully';
-    sub.textContent   = `p (${Math.round(p * 100)}%) ≈ p* (${Math.round(pStar * 100)}%). Consider non-monetary levers first.`;
-  } else {
-    box.classList.add('decision-risk');
-    title.textContent = 'Do not offer — not cost-justified';
-    sub.textContent   = `p (${Math.round(p * 100)}%) < p* (${Math.round(pStar * 100)}%). Package cost exceeds expected replacement saving.`;
-  }
-
-  renderDecisionChart(cr, cp, lift);
-}
-
 // ── Portfolio ────────────────────────────────────────────────────────────────
 function populateFilter(selectId, field) {
   const sel = el(selectId);
@@ -679,6 +631,61 @@ async function askAI() {
     statusEl.innerHTML = `<i class="ti ti-x"></i><span>${escapeHTML(err.message)}</span>`;
     statusEl.style.display = 'flex';
   }
+}
+
+// ── JSON Export / Import ─────────────────────────────────────────────────────
+
+function exportJSON() {
+  const payload = {
+    version: 1,
+    exported: new Date().toISOString(),
+    isLiveData,
+    data: DATA,
+    attritionData: ATTRITION_DATA,
+    scenarios: SCENARIOS,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'dashboard-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file) {
+  if (!file) return;
+  el('upload-panel').style.display = 'block';
+  showStatus('Reading ' + file.name + '…', 'loading');
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const payload = JSON.parse(e.target.result);
+      if (!Array.isArray(payload.data) || payload.data.length === 0) {
+        showStatus('Invalid JSON — no employee data found.', 'error');
+        return;
+      }
+      DATA           = payload.data;
+      ATTRITION_DATA = payload.attritionData || null;
+      if (payload.scenarios) {
+        SCENARIOS.base = payload.scenarios.base;
+        SCENARIOS.bull = payload.scenarios.bull;
+        SCENARIOS.bear = payload.scenarios.bear;
+        _rateInputsSynced = false;
+      }
+      isLiveData = payload.isLiveData !== undefined ? payload.isLiveData : true;
+      el('data-badge').className = 'data-source-badge ds-live';
+      el('data-badge').innerHTML = '<i class="ti ti-database"></i> Live data';
+      const dateStr = payload.exported ? ' · exported ' + payload.exported.slice(0, 10) : '';
+      showStatus(`Loaded ${DATA.length} employees from ${file.name}${dateStr}`, 'success');
+      refreshAll();
+    } catch (err) {
+      showStatus('JSON parse error: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

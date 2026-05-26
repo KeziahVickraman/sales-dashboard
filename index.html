@@ -20,6 +20,13 @@
         </span>
       </div>
       <div class="header-right">
+        <button class="btn-outline" onclick="exportJSON()">
+          <i class="ti ti-download"></i> Export JSON
+        </button>
+        <button class="btn-outline" onclick="document.getElementById('json-import-trigger').click()">
+          <i class="ti ti-file-import"></i> Import JSON
+        </button>
+        <input type="file" id="json-import-trigger" accept=".json" style="display:none" onchange="importJSON(this.files[0])" />
         <button class="btn-primary" onclick="document.getElementById('upload-trigger').click()">
           <i class="ti ti-upload"></i> Upload Excel
         </button>
@@ -70,11 +77,33 @@
       <div class="nav-section nav-section-bonus">
         <div class="nav-section-title">BONUS</div>
         <div class="nav-section-tabs">
-          <button class="tab" onclick="showPanel('decision', this)"><i class="ti ti-scale"></i> Decision Engine</button>
           <button class="tab" onclick="showPanel('ai', this)"><i class="ti ti-sparkles"></i> AI Insights</button>
         </div>
       </div>
     </nav>
+
+    <!-- User Manual -->
+    <div class="card transparency-card user-manual-card">
+      <details>
+        <summary class="transparency-summary">
+          <i class="ti ti-book-2"></i>
+          <span>User Manual — how to use this dashboard</span>
+          <i class="ti ti-chevron-down transparency-chevron"></i>
+        </summary>
+        <div class="transparency-body">
+          <h4><i class="ti ti-file-spreadsheet" style="margin-right:5px"></i>Building your dashboard from scratch</h4>
+          <p>Click <strong>Upload Excel</strong> in the top-right corner and select your <code>sales_template.xlsx</code> file. The dashboard will read the <code>full_data</code> sheet (and <code>attrition_analysis</code> if present) and instantly populate all tabs — Overview, Portfolio, Historical Trend, Attrition Prediction, and Revenue Forecast — with your live data. The badge in the top-left will switch from <strong>Demo data</strong> to <strong>Live data</strong> to confirm.</p>
+
+          <h4><i class="ti ti-download" style="margin-right:5px"></i>Sharing your dashboard with a colleague</h4>
+          <p>Once your data is loaded, click <strong>Export JSON</strong> in the top-right corner. This downloads a snapshot file (e.g. <code>dashboard-2026-05-26.json</code>) containing all your employee data, attrition figures, and any scenario settings you have edited. Send this file to your colleague — via email, Teams, or any file transfer.</p>
+
+          <h4><i class="ti ti-file-import" style="margin-right:5px"></i>Viewing a colleague's dashboard</h4>
+          <p>Received a JSON snapshot from a colleague? Click <strong>Import JSON</strong> in the top-right corner and select the file. The dashboard will load exactly as they left it — same data, same scenario growth rates — so you can explore and analyse without needing the original Excel file.</p>
+
+          <p class="transparency-note" style="margin-top:14px">💡 Let's build something great together!</p>
+        </div>
+      </details>
+    </div>
 
     <main class="dash-main">
 
@@ -383,78 +412,6 @@
                 <li>all other GM bands = +10</li>
               </ul>
               <p class="transparency-note">The feature-importance chart reflects this current proxy model. A trained model can replace it once labelled historical attrition outcomes are available.</p>
-            </div>
-          </details>
-        </div>
-      </section>
-
-      <!-- DECISION ENGINE -->
-      <section id="panel-decision" class="panel">
-        <div class="decision-layout">
-          <div class="card">
-            <div class="card-title">Retention package model</div>
-            <div class="slider-row">
-              <label class="slider-label" for="sl-p">Attrition probability</label>
-              <input id="sl-p" type="range" min="0" max="80" value="25" oninput="updateDecision()" />
-              <span class="slider-val" id="out-p">25%</span>
-            </div>
-            <div class="slider-row">
-              <label class="slider-label" for="sl-cr">Replacement cost</label>
-              <input id="sl-cr" type="range" min="5000" max="80000" step="1000" value="30000" oninput="updateDecision()" />
-              <span class="slider-val" id="out-cr">$30k</span>
-            </div>
-            <div class="slider-row">
-              <label class="slider-label" for="sl-cp">Package cost</label>
-              <input id="sl-cp" type="range" min="1000" max="40000" step="1000" value="8000" oninput="updateDecision()" />
-              <span class="slider-val" id="out-cp">$8k</span>
-            </div>
-            <div class="slider-row">
-              <label class="slider-label" for="sl-lift">Risk reduction</label>
-              <input id="sl-lift" type="range" min="5" max="80" value="40" oninput="updateDecision()" />
-              <span class="slider-val" id="out-lift">40%</span>
-            </div>
-            <div class="formula-box" id="formula-out"></div>
-          </div>
-          <div class="card">
-            <div id="decision-result" class="decision-box">
-              <div class="decision-title" id="dec-title">Decision pending</div>
-              <div class="decision-sub" id="dec-sub"></div>
-            </div>
-            <div class="kpi-grid">
-              <div class="kpi"><div class="kpi-label">Do nothing</div><div class="kpi-value" id="dec-nothing">-</div></div>
-              <div class="kpi"><div class="kpi-label">Offer package</div><div class="kpi-value" id="dec-offer-cost">-</div></div>
-              <div class="kpi"><div class="kpi-label">Break-even p*</div><div class="kpi-value" id="dec-pstar">-</div></div>
-              <div class="kpi"><div class="kpi-label">Expected saving</div><div class="kpi-value" id="dec-savings">-</div></div>
-            </div>
-            <div class="chart-wrap h240"><canvas id="c-decision" role="img" aria-label="Retention decision cost curves">Decision chart.</canvas></div>
-          </div>
-        </div>
-        <div class="card transparency-card">
-          <details>
-            <summary class="transparency-summary">
-              <i class="ti ti-info-circle"></i>
-              <span>See model used for decision</span>
-              <i class="ti ti-chevron-down transparency-chevron"></i>
-            </summary>
-            <div class="transparency-body">
-              <h4>Expected cost model</h4>
-              <p>The decision engine compares the expected cost of doing nothing against the expected cost of offering a retention package.</p>
-              <div class="transparency-formula">
-                Do nothing = p × C_replace<br>
-                Offer package = C_package + (p - lift × p) × C_replace
-              </div>
-              <h4>Break-even rule</h4>
-              <div class="transparency-formula">
-                Offer iff p &gt; C_package / (C_replace × lift)
-              </div>
-              <h4>Operating assumptions</h4>
-              <ul>
-                <li><code>p</code> is the estimated attrition probability from judgement or the prediction tab.</li>
-                <li><code>C_replace</code> is the total replacement cost, including hiring, onboarding, downtime, and client disruption.</li>
-                <li><code>C_package</code> is the incremental cost of the retention offer.</li>
-                <li><code>lift</code> is the expected proportional reduction in attrition probability after the package is offered.</li>
-                <li>The model only evaluates direct expected cost and does not include fairness, precedent, morale, or non-financial client-risk considerations.</li>
-              </ul>
             </div>
           </details>
         </div>
