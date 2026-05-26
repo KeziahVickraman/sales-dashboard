@@ -142,7 +142,7 @@
             <div class="chart-wrap h200"><canvas id="c-monthly" role="img" aria-label="Monthly revenue 2026">Monthly revenue.</canvas></div>
           </div>
         </div>
-        <div class="row-3">
+        <div class="row-2">
           <div class="card">
             <div class="card-title-row">
               <span class="card-title">GM% distribution</span>
@@ -157,13 +157,13 @@
             </div>
             <div class="chart-wrap h180"><canvas id="c-visa" role="img" aria-label="Visa status breakdown">Visa breakdown.</canvas></div>
           </div>
-          <div class="card">
-            <div class="card-title-row">
-              <span class="card-title">Revenue by location</span>
-              <button class="btn-expand" onclick="openChartFullscreen('c-loc','Revenue by location')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
-            </div>
-            <div class="chart-wrap h180"><canvas id="c-loc" role="img" aria-label="Revenue by location">Revenue by location.</canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title-row">
+            <span class="card-title">Revenue by location</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-loc','Revenue by location')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
           </div>
+          <div class="chart-wrap h180"><canvas id="c-loc" role="img" aria-label="Revenue by location">Revenue by location.</canvas></div>
         </div>
       </section>
 
@@ -329,7 +329,7 @@
       <section id="panel-attrition-analysis" class="panel">
         <div class="filter-bar">
           <select id="aa-year" onchange="renderAttritionAnalysis()">
-            <option value="">All years (2023â€“2025)</option>
+            <option value=””>All years (2023–2025)</option>
             <option value="2023">2023</option>
             <option value="2024">2024</option>
             <option value="2025" selected>2025</option>
