@@ -120,15 +120,16 @@ function renderLocationChart(data, targetId) {
 
 // ── Forecast charts ──────────────────────────────────────────────────────────
 
-function renderForecastChart(hist, proj, targetId) {
+function renderForecastChart(hist, proj, targetId, forecastYears) {
+  const years = ['2023', '2024', '2025', ...(forecastYears || [2026, 2027, 2028]).map(String)];
   mkChart(targetId || 'c-forecast', {
     type: 'line',
     data: {
-      labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
+      labels: years,
       datasets: [
         { label: 'Upper band', data: [null, null, null, ...proj.map((v, i) => v * (1 + 0.08 + i * 0.02))], borderWidth: 0, backgroundColor: 'rgba(27,157,117,0.10)', fill: '+1', pointRadius: 0 },
         { label: 'Lower band', data: [null, null, null, ...proj.map((v, i) => v * (1 - 0.06 - i * 0.015))], borderWidth: 0, fill: false, pointRadius: 0 },
-        { label: 'Historic', data: [...hist, null, null, null], borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.08)', fill: true, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+        { label: 'Historic', data: [...hist, ...proj.map(() => null)], borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.08)', fill: true, tension: 0.3, pointRadius: 5, borderWidth: 2 },
         { label: 'Projected', data: [null, null, hist[2], ...proj], borderColor: '#1D9E75', borderDash: [6, 3], tension: 0.3, pointRadius: 5, borderWidth: 2, fill: false },
       ],
     },
@@ -140,13 +141,14 @@ function renderForecastChart(hist, proj, targetId) {
   });
 }
 
-function renderHeadcountForecastChart(hcH, hcP, targetId) {
+function renderHeadcountForecastChart(hcH, hcP, targetId, forecastYears) {
+  const years = ['2023', '2024', '2025', ...(forecastYears || [2026, 2027, 2028]).map(String)];
   mkChart(targetId || 'c-hcfc', {
     type: 'bar',
     data: {
-      labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
+      labels: years,
       datasets: [
-        { label: 'Actual',    data: [...hcH, null, null, null], backgroundColor: '#378ADD', borderRadius: 4 },
+        { label: 'Actual',    data: [...hcH, ...hcP.map(() => null)], backgroundColor: '#378ADD', borderRadius: 4 },
         { label: 'Projected', data: [null, null, null, ...hcP], backgroundColor: '#1D9E75', borderRadius: 4 },
       ],
     },
@@ -158,11 +160,12 @@ function renderHeadcountForecastChart(hcH, hcP, targetId) {
   });
 }
 
-function renderRPRChart(rprH, rprP, targetId) {
+function renderRPRChart(rprH, rprP, targetId, forecastYears) {
+  const years = ['2023', '2024', '2025', ...(forecastYears || [2026, 2027, 2028]).map(String)];
   mkChart(targetId || 'c-rpr', {
     type: 'line',
     data: {
-      labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
+      labels: years,
       datasets: [{ label: 'Rev/resource', data: [...rprH, ...rprP], borderColor: '#BA7517', tension: 0.3, pointRadius: 5, fill: false, borderWidth: 2 }],
     },
     options: {

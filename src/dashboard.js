@@ -12,6 +12,7 @@ let DATA = [...DEMO_DATA];
 let ATTRITION_DATA = null; // populated from attrition_analysis sheet when present
 let isLiveData = false;
 let currentScenario = 'base';
+let forecastYears = [2026, 2027, 2028];
 
 // Scenarios are mutable so users can edit YoY revenue growth rates from
 // the Forecast panel. Headcount growth (hcGrowth) stays fixed for now.
@@ -157,10 +158,50 @@ function fmtRatePct(r) {
   return Number.isInteger(v) ? String(v) : String(v);
 }
 
+function ensureForecastArrays() {
+  const defaults = {
+    base: { growth: 0.12, hcGrowth: 0.10 },
+    bull: { growth: 0.18, hcGrowth: 0.15 },
+    bear: { growth: 0.05, hcGrowth: 0.03 },
+  };
+  ['base', 'bull', 'bear'].forEach(sc => {
+    while (SCENARIOS[sc].growth.length < forecastYears.length) {
+      SCENARIOS[sc].growth.push(SCENARIOS[sc].growth.at(-1) ?? defaults[sc].growth);
+    }
+    while (SCENARIOS[sc].hcGrowth.length < forecastYears.length) {
+      SCENARIOS[sc].hcGrowth.push(SCENARIOS[sc].hcGrowth.at(-1) ?? defaults[sc].hcGrowth);
+    }
+    SCENARIOS[sc].growth = SCENARIOS[sc].growth.slice(0, forecastYears.length);
+    SCENARIOS[sc].hcGrowth = SCENARIOS[sc].hcGrowth.slice(0, forecastYears.length);
+  });
+}
+
 /** Push current SCENARIOS values into the editable rate inputs */
 function syncRateInputsFromScenarios() {
+  ensureForecastArrays();
+  const ratesHead = el('rates-head');
+  const ratesBody = el('rates-body');
+  if (!ratesHead || !ratesBody) return;
+
+  ratesHead.innerHTML = `<tr>
+    <th>Scenario</th>
+    ${forecastYears.map((year, i) => `<th><input class="year-input" type="number" value="${year}" onchange="updateForecastYear(${i}, this)" /></th>`).join('')}
+    <th></th>
+  </tr>`;
+
+  const rows = [
+    ['base', 'Base', ''],
+    ['bull', 'Bull', `<button class="btn-suggest" onclick="suggestFromBase('bull')">Suggest from base</button>`],
+    ['bear', 'Bear', `<button class="btn-suggest" onclick="suggestFromBase('bear')">Suggest from base</button>`],
+  ];
+  ratesBody.innerHTML = rows.map(([key, label, action]) => `<tr>
+    <td><strong>${label}</strong></td>
+    ${forecastYears.map((_, i) => `<td><span class="rate-input-wrap"><input type="number" id="r-${key}-${i}" step="0.5" onchange="updateRate('${key}', ${i}, this)" /><span class="rate-pct">%</span></span></td>`).join('')}
+    <td>${action}</td>
+  </tr>`).join('');
+
   ['base', 'bull', 'bear'].forEach(sc => {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < forecastYears.length; i++) {
       const inp = el(`r-${sc}-${i}`);
       if (inp) inp.value = fmtRatePct(SCENARIOS[sc].growth[i]);
     }
@@ -175,57 +216,102 @@ function updateRate(scenario, idx, inputEl) {
   renderForecast();
 }
 
+function updateForecastYear(idx, inputEl) {
+  const year = parseInt(inputEl.value, 10);
+  if (!Number.isFinite(year) || year < 2026) {
+    inputEl.value = forecastYears[idx];
+    return;
+  }
+  forecastYears[idx] = year;
+  renderForecast();
+}
+
+function addForecastYear() {
+  const nextYear = (forecastYears.at(-1) || 2025) + 1;
+  forecastYears.push(nextYear);
+  ['base', 'bull', 'bear'].forEach(sc => {
+    SCENARIOS[sc].growth.push(SCENARIOS[sc].growth.at(-1) ?? 0);
+    SCENARIOS[sc].hcGrowth.push(SCENARIOS[sc].hcGrowth.at(-1) ?? 0);
+  });
+  _rateInputsSynced = false;
+  renderForecast();
+}
+
+function removeForecastYear() {
+  if (forecastYears.length <= 1) return;
+  forecastYears.pop();
+  ['base', 'bull', 'bear'].forEach(sc => {
+    SCENARIOS[sc].growth.pop();
+    SCENARIOS[sc].hcGrowth.pop();
+  });
+  _rateInputsSynced = false;
+  renderForecast();
+}
+
 /** Fill bull or bear from base ± fixed deltas (per-year, clamped at 0) */
 function suggestFromBase(scenario) {
   const deltas = SUGGEST_DELTAS[scenario];
   if (!deltas) return;
   const baseGrowth = SCENARIOS.base.growth;
   SCENARIOS[scenario].growth = baseGrowth.map((g, i) =>
-    Math.max(0, g * 100 + deltas[i]) / 100
+    Math.max(0, g * 100 + (deltas[i] ?? deltas.at(-1) ?? 0)) / 100
   );
   syncRateInputsFromScenarios();
   renderForecast();
 }
 
-function renderForecast() {
-  if (!_rateInputsSynced) {
-    syncRateInputsFromScenarios();
-    _rateInputsSynced = true;
-  }
+function buildForecastSeries() {
+  ensureForecastArrays();
   const sc          = SCENARIOS[currentScenario];
   const base2025Rev = DATA.reduce((s, e) => s + e.annualRev, 0);
   const base2025HC  = DATA.length;
 
   const hist = [base2025Rev * 0.68, base2025Rev * 0.82, base2025Rev];
-  const proj = [hist[2] * (1 + sc.growth[0]), 0, 0];
-  proj[1] = proj[0] * (1 + sc.growth[1]);
-  proj[2] = proj[1] * (1 + sc.growth[2]);
-  const cagr = hist[2] > 0 ? (Math.pow(proj[2] / hist[2], 1 / 3) - 1) * 100 : 0;
-
-  el('fc-26r').textContent = fmt(proj[0]);
-  el('fc-27r').textContent = fmt(proj[1]);
-  el('fc-28r').textContent = fmt(proj[2]);
-  el('fc-cagr').textContent = cagr.toFixed(1) + '%';
+  const proj = sc.growth.reduce((acc, growth, i) => {
+    const prev = i === 0 ? hist[2] : acc[i - 1];
+    acc.push(prev * (1 + growth));
+    return acc;
+  }, []);
 
   const hcH = [Math.round(base2025HC * 0.72), Math.round(base2025HC * 0.85), base2025HC];
-  const hcP = [Math.round(base2025HC * (1 + sc.hcGrowth[0])), 0, 0];
-  hcP[1] = Math.round(hcP[0] * (1 + sc.hcGrowth[1]));
-  hcP[2] = Math.round(hcP[1] * (1 + sc.hcGrowth[2]));
+  const hcP = sc.hcGrowth.reduce((acc, growth, i) => {
+    const prev = i === 0 ? base2025HC : acc[i - 1];
+    acc.push(Math.round(prev * (1 + growth)));
+    return acc;
+  }, []);
 
   const safeDiv = (a, b) => b > 0 ? a / b : 0;
   const rprH = hist.map((r, i) => safeDiv(r, hcH[i]));
   const rprP = proj.map((r, i) => safeDiv(r, hcP[i]));
 
-  renderForecastChart(hist, proj);
-  renderHeadcountForecastChart(hcH, hcP);
-  renderRPRChart(rprH, rprP);
+  return { base2025Rev, base2025HC, hist, proj, hcH, hcP, rprH, rprP };
+}
+
+function renderForecast() {
+  syncRateInputsFromScenarios();
+  _rateInputsSynced = true;
+  const { base2025HC, hist, proj, hcH, hcP, rprH, rprP } = buildForecastSeries();
+  const safeDiv = (a, b) => b > 0 ? a / b : 0;
+  const cagr = hist[2] > 0 && proj.length > 0 ? (Math.pow(proj.at(-1) / hist[2], 1 / proj.length) - 1) * 100 : 0;
+
+  el('forecast-kpis').innerHTML = [
+    ...forecastYears.map((year, i) => `<div class="kpi"><div class="kpi-label">${year} projected revenue</div><div class="kpi-value">${fmt(proj[i])}</div></div>`),
+    `<div class="kpi"><div class="kpi-label">${forecastYears.length}-yr CAGR</div><div class="kpi-value">${cagr.toFixed(1)}%</div></div>`,
+  ].join('');
+  const lastYear = forecastYears.at(-1);
+  el('forecast-chart-title').textContent = `Revenue forecast 2023–${lastYear} with confidence band`;
+
+  renderForecastChart(hist, proj, null, forecastYears);
+  renderHeadcountForecastChart(hcH, hcP, null, forecastYears);
+  renderRPRChart(rprH, rprP, null, forecastYears);
 
   // Projection table
+  el('proj-head').innerHTML = `<tr><th>Metric</th><th>2025 (actual)</th>${forecastYears.map(year => `<th>${year}</th>`).join('')}</tr>`;
   const rows = [
     ['Headcount',          ...[base2025HC, ...hcP].map(Math.round)],
     ['Annual revenue',     ...[hist[2], ...proj].map(fmt)],
     ['Annual margin',      ...[hist[2] * 0.137, ...proj.map(v => v * 0.14)].map(fmt)],
-    ['GM %',               '13.7%', '14.0%', '14.0%', '14.0%'],
+    ['GM %',               '13.7%', ...forecastYears.map(() => '14.0%')],
     ['Revenue / resource', ...[safeDiv(hist[2], base2025HC), ...rprP].map(fmt)],
   ];
   el('proj-tbody').innerHTML = rows
@@ -514,26 +600,7 @@ function renderTrend() {
 // ── Chart fullscreen modal ───────────────────────────────────────────────────
 
 function getForecastSeries() {
-  const sc = SCENARIOS[currentScenario];
-  const base2025Rev = DATA.reduce((s, e) => s + e.annualRev, 0);
-  const base2025HC = DATA.length;
-  const hist = [base2025Rev * 0.68, base2025Rev * 0.82, base2025Rev];
-  const proj = [hist[2] * (1 + sc.growth[0]), 0, 0];
-  proj[1] = proj[0] * (1 + sc.growth[1]);
-  proj[2] = proj[1] * (1 + sc.growth[2]);
-  const hcH = [Math.round(base2025HC * 0.72), Math.round(base2025HC * 0.85), base2025HC];
-  const hcP = [Math.round(base2025HC * (1 + sc.hcGrowth[0])), 0, 0];
-  hcP[1] = Math.round(hcP[0] * (1 + sc.hcGrowth[1]));
-  hcP[2] = Math.round(hcP[1] * (1 + sc.hcGrowth[2]));
-  const safeDiv = (a, b) => b > 0 ? a / b : 0;
-  return {
-    hist,
-    proj,
-    hcH,
-    hcP,
-    rprH: hist.map((r, i) => safeDiv(r, hcH[i])),
-    rprP: proj.map((r, i) => safeDiv(r, hcP[i])),
-  };
+  return buildForecastSeries();
 }
 
 function getAttritionTrendInput() {
@@ -624,15 +691,15 @@ const FS_CHART_MAP = {
   'c-loc':     () => renderLocationChart(DATA,     'c-fs-canvas'),
   'c-forecast': () => {
     const s = getForecastSeries();
-    renderForecastChart(s.hist, s.proj, 'c-fs-canvas');
+    renderForecastChart(s.hist, s.proj, 'c-fs-canvas', forecastYears);
   },
   'c-hcfc': () => {
     const s = getForecastSeries();
-    renderHeadcountForecastChart(s.hcH, s.hcP, 'c-fs-canvas');
+    renderHeadcountForecastChart(s.hcH, s.hcP, 'c-fs-canvas', forecastYears);
   },
   'c-rpr': () => {
     const s = getForecastSeries();
-    renderRPRChart(s.rprH, s.rprP, 'c-fs-canvas');
+    renderRPRChart(s.rprH, s.rprP, 'c-fs-canvas', forecastYears);
   },
   'c-aa-trend': () => renderAttritionAnalysisChart(getAttritionAnalysisRows(), 'c-fs-canvas'),
   'c-attr-trend': () => renderAttritionTrendChart(getAttritionTrendInput(), 'c-fs-canvas'),
@@ -780,6 +847,7 @@ function exportJSON() {
     data: DATA,
     attritionData: ATTRITION_DATA,
     scenarios: SCENARIOS,
+    forecastYears,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -809,6 +877,10 @@ function importJSON(file) {
         SCENARIOS.base = payload.scenarios.base;
         SCENARIOS.bull = payload.scenarios.bull;
         SCENARIOS.bear = payload.scenarios.bear;
+        if (Array.isArray(payload.forecastYears) && payload.forecastYears.length > 0) {
+          const importedYears = payload.forecastYears.map(y => parseInt(y, 10)).filter(Number.isFinite);
+          if (importedYears.length > 0) forecastYears = importedYears;
+        }
         _rateInputsSynced = false;
       }
       isLiveData = payload.isLiveData !== undefined ? payload.isLiveData : true;

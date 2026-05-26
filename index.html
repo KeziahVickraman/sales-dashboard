@@ -185,56 +185,28 @@
         </div>
 
         <div class="card">
-          <div class="card-title">Growth rate assumptions — YoY revenue % (editable)</div>
+          <div class="card-title-row">
+            <span class="card-title">Growth rate assumptions — years and YoY revenue % (editable)</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn-suggest" onclick="addForecastYear()"><i class="ti ti-plus"></i> Add year</button>
+              <button class="btn-suggest" onclick="removeForecastYear()"><i class="ti ti-minus"></i> Remove year</button>
+            </div>
+          </div>
           <div style="overflow-x:auto">
             <table class="rates-table">
-              <thead>
-                <tr>
-                  <th>Scenario</th>
-                  <th>2026</th>
-                  <th>2027</th>
-                  <th>2028</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Base</strong></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-base-0" step="0.5" onchange="updateRate('base', 0, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-base-1" step="0.5" onchange="updateRate('base', 1, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-base-2" step="0.5" onchange="updateRate('base', 2, this)" /><span class="rate-pct">%</span></span></td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td><strong>Bull</strong></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-0" step="0.5" onchange="updateRate('bull', 0, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-1" step="0.5" onchange="updateRate('bull', 1, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bull-2" step="0.5" onchange="updateRate('bull', 2, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><button class="btn-suggest" onclick="suggestFromBase('bull')" title="Suggested = base + 7 / +7 / +6">Suggest from base</button></td>
-                </tr>
-                <tr>
-                  <td><strong>Bear</strong></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-0" step="0.5" onchange="updateRate('bear', 0, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-1" step="0.5" onchange="updateRate('bear', 1, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><span class="rate-input-wrap"><input type="number" id="r-bear-2" step="0.5" onchange="updateRate('bear', 2, this)" /><span class="rate-pct">%</span></span></td>
-                  <td><button class="btn-suggest" onclick="suggestFromBase('bear')" title="Suggested = base − 10 / −9 / −7 (clamped at 0)">Suggest from base</button></td>
-                </tr>
-              </tbody>
+              <thead id="rates-head"></thead>
+              <tbody id="rates-body"></tbody>
             </table>
           </div>
-          <p class="section-intro" style="margin-top:10px; margin-bottom:0">Edit any cell to update the projection. Headcount growth rates remain fixed (Base 20/12/10%, Bull 28/20/15%, Bear 5/4/3%).</p>
+          <p class="section-intro" style="margin-top:10px; margin-bottom:0">Edit any year or growth-rate cell to update the projection. Add or remove years to control the projection horizon.</p>
         </div>
 
-        <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-label">2026 projected revenue</div><div class="kpi-value" id="fc-26r">—</div></div>
-          <div class="kpi"><div class="kpi-label">2027 projected revenue</div><div class="kpi-value" id="fc-27r">—</div></div>
-          <div class="kpi"><div class="kpi-label">2028 projected revenue</div><div class="kpi-value" id="fc-28r">—</div></div>
-          <div class="kpi"><div class="kpi-label">3-yr CAGR</div><div class="kpi-value" id="fc-cagr">—</div></div>
+        <div class="kpi-grid" id="forecast-kpis">
         </div>
         <div class="card">
           <div class="card-title-row">
-            <span class="card-title">Revenue forecast 2023–2028 with confidence band</span>
-            <button class="btn-expand" onclick="openChartFullscreen('c-forecast','Revenue forecast 2023–2028 with confidence band')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            <span class="card-title" id="forecast-chart-title">Revenue forecast 2023–2028 with confidence band</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-forecast', el('forecast-chart-title').textContent)" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
           </div>
           <div class="legend">
             <span><span class="leg-sq" style="background:#378ADD"></span>Historic</span>
@@ -251,7 +223,7 @@
           <div class="card-title">Projection table (model output)</div>
           <div style="overflow-x:auto">
             <table class="proj-table">
-              <thead><tr><th>Metric</th><th>2025 (actual)</th><th>2026</th><th>2027</th><th>2028</th></tr></thead>
+              <thead id="proj-head"></thead>
               <tbody id="proj-tbody"></tbody>
             </table>
           </div>
@@ -284,15 +256,15 @@
               <h4>2. Forward projection formula</h4>
               <p>Revenue compounds year-on-year using scenario-specific growth rates that taper as the base grows:</p>
               <div class="transparency-formula">
-                2026 = 2025 × (1 + g₁)<br>
-                2027 = 2026 × (1 + g₂)<br>
-                2028 = 2027 × (1 + g₃)
+                Year 1 = 2025 × (1 + g₁)<br>
+                Year 2 = Year 1 × (1 + g₂)<br>
+                Year n = Year n-1 × (1 + gₙ)
               </div>
               <p>Headcount projection uses the same compounding pattern with separate <code>hcGrowth</code> rates per scenario, then revenue-per-resource is derived as <code>revenue ÷ headcount</code> for each year.</p>
 
-              <h4>3. 3-year CAGR</h4>
+              <h4>3. Projection CAGR</h4>
               <div class="transparency-formula">
-                CAGR = ( (2028 revenue ÷ 2025 revenue) ^ (1 ÷ 3) − 1 ) × 100%
+                CAGR = ( (final projected revenue ÷ 2025 revenue) ^ (1 ÷ projected years) − 1 ) × 100%
               </div>
 
               <h4>4. Confidence band</h4>
@@ -301,21 +273,10 @@
                 upper bound = projection × (1 + 0.08 + i × 0.02)<br>
                 lower bound = projection × (1 − 0.06 − i × 0.015)
               </div>
-              <p class="transparency-note">Where <code>i</code> = 0, 1, 2 for 2026, 2027, 2028. This is illustrative — not a statistical prediction interval.</p>
+              <p class="transparency-note">Where <code>i</code> is the projection step, starting at 0 for the first projected year. This is illustrative — not a statistical prediction interval.</p>
 
               <h4>5. Scenario rationale &amp; rates</h4>
-              <div style="overflow-x:auto">
-                <table class="scenario-table">
-                  <thead>
-                    <tr><th>Scenario</th><th>2026</th><th>2027</th><th>2028</th><th>Headcount YoY</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td><strong>Base</strong></td><td>+18%</td><td>+15%</td><td>+12%</td><td>+20 / +12 / +10%</td></tr>
-                    <tr><td><strong>Bull</strong></td><td>+25%</td><td>+22%</td><td>+18%</td><td>+28 / +20 / +15%</td></tr>
-                    <tr><td><strong>Bear</strong></td><td>+8%</td><td>+6%</td><td>+5%</td><td>+5 / +4 / +3%</td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <p>The editable table above is the live source of truth for forecast years and scenario growth rates. Added years reuse the final existing growth assumptions until edited.</p>
 
               <p><strong>Base case</strong> — assumes the current client pipeline holds, modest rate uplift on renewals, and normal attrition replaced in line with growth. Growth tapers from 18% to 12% as the larger revenue base makes the same dollar increment a smaller percentage.</p>
 

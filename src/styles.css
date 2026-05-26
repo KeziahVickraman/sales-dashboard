@@ -543,6 +543,21 @@ input[type="range"] { flex: 1; cursor: pointer; }
 }
 .rate-pct { font-size: 12px; color: var(--color-text-secondary); }
 
+.year-input {
+  width: 76px;
+  padding: 5px 8px;
+  border: 0.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.year-input:focus {
+  outline: none;
+  border-color: var(--color-blue);
+}
+
 .btn-suggest {
   padding: 5px 10px;
   border: 0.5px solid var(--color-border-strong);
