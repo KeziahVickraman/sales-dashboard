@@ -181,17 +181,18 @@ function renderRPRChart(rprH, rprP, targetId, forecastYears) {
 /**
  * Accepts either:
  *   - a single number → falls back to the legacy synthetic [12, 14, X] pattern
- *   - an array of 3 numbers (percentages) → plots real 2023/2024/2025 rates
+ *   - an array of numbers (percentages) → plots real rates for the supplied years
  */
-function renderAttritionTrendChart(attrRateOrRates, targetId) {
+function renderAttritionTrendChart(attrRateOrRates, targetId, years) {
+  const labels = (years || [2023, 2024, 2025]).map(String);
   const rates = Array.isArray(attrRateOrRates)
     ? attrRateOrRates
-    : [12, 14, attrRateOrRates];
+    : labels.map((_, i) => i === labels.length - 1 ? attrRateOrRates : (i === 0 ? 12 : 14));
   const retention = rates.map(r => 100 - r);
   mkChart(targetId || 'c-attr-trend', {
     type: 'line',
     data: {
-      labels: ['2023', '2024', '2025'],
+      labels,
       datasets: [
         { label: 'Attrition %', data: rates,     borderColor: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.08)', fill: true, tension: 0.3, pointRadius: 6, borderWidth: 2 },
         { label: 'Retention %', data: retention, borderColor: '#1D9E75', tension: 0.3, pointRadius: 6, fill: false, borderWidth: 2 },
@@ -332,7 +333,7 @@ function renderTrendByClientChart(data, years, targetId) {
       datasets: years.map((y, i) => ({
         label: String(y),
         data: clients.map(c =>
-          data.filter(e => e.client === c).reduce((s, e) => s + (e.yearly[y]?.rev || 0), 0)
+          data.filter(e => e.client === c).reduce((s, e) => s + (e.yearly?.[y]?.rev || 0), 0)
         ),
         backgroundColor: PALETTE[i % PALETTE.length],
         borderRadius: 4,
@@ -358,7 +359,7 @@ function renderTrendByRoleChart(data, years, targetId) {
       datasets: years.map((y, i) => ({
         label: String(y),
         data: roles.map(r =>
-          data.filter(e => e.role === r).reduce((s, e) => s + (e.yearly[y]?.rev || 0), 0)
+          data.filter(e => e.role === r).reduce((s, e) => s + (e.yearly?.[y]?.rev || 0), 0)
         ),
         backgroundColor: PALETTE[i % PALETTE.length],
         borderRadius: 4,

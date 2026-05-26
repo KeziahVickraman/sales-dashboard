@@ -10,12 +10,13 @@
  *   name, client, visa, role, loc, months,
  *   daily, monthly, salary, cpf, fees, ctc,
  *   gp, gm, annualRev, annualMargin,
- *   yearly: { 2023: {rev, margin}, 2024: {rev, margin}, 2025: {rev, margin} }
+ *   yearly: { [year]: {rev, margin} }
  * }
  */
 
-const TREND_YEARS = [2023, 2024, 2025];
-const TREND_REF_YEAR = 2025;
+const DEFAULT_TREND_YEARS = [2023, 2024, 2025];
+let TREND_YEARS = DEFAULT_TREND_YEARS.slice();
+let TREND_REF_YEAR = 2025;
 const TREND_YOY_GROWTH = 1.12;
 
 // May–Dec 2026 columns from full_data. The values represent DAYS WORKED
@@ -49,6 +50,29 @@ function deriveYearly(emp) {
     yearly[year] = { rev, margin };
   }
   return yearly;
+}
+
+function detectTrendYearColumns(rows) {
+  const headers = [...new Set(rows.flatMap(row => Object.keys(row || {})))];
+  const revCols = {};
+  const marginCols = {};
+  const norm = value => String(value).trim().toLowerCase();
+
+  headers.forEach(header => {
+    const text = norm(header);
+    const match = text.match(/(20\d{2})/);
+    if (!match) return;
+    const year = parseInt(match[1], 10);
+    if (/(annual\s*)?(revenue|rev)\b/.test(text)) revCols[year] = header;
+    if (/(annual\s*)?(margin|gross profit|gp)\b/.test(text)) marginCols[year] = header;
+  });
+
+  const years = [...new Set([
+    ...Object.keys(revCols).map(Number),
+    ...Object.keys(marginCols).map(Number),
+  ])].sort((a, b) => a - b);
+
+  return { years, revCols, marginCols };
 }
 
 const DEMO_DATA_BASE = [
@@ -116,6 +140,14 @@ function parseWorkbook(wb) {
 
   const ws   = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+  const trendCols = detectTrendYearColumns(rows);
+  if (trendCols.years.length > 0) {
+    TREND_YEARS = trendCols.years;
+    TREND_REF_YEAR = TREND_YEARS[TREND_YEARS.length - 1];
+  } else {
+    TREND_YEARS = DEFAULT_TREND_YEARS.slice();
+    TREND_REF_YEAR = TREND_YEARS[TREND_YEARS.length - 1];
+  }
 
   // Header lookup is whitespace- and case-insensitive so trailing spaces
   // in the template ("Client ", "Annual Revenue ", etc.) don't silently
@@ -167,9 +199,12 @@ function parseWorkbook(wb) {
     // per-year columns from the sheet on top.
     const yearly = deriveYearly(emp);
     for (const y of TREND_YEARS) {
-      const realRev    = parseFloat(findVal(COL_MAP['rev' + y]));
-      const realMargin = parseFloat(findVal(COL_MAP['margin' + y]));
-      if (!isNaN(realRev))    yearly[y].rev    = realRev;
+      const realRev    = parseFloat(trendCols.revCols[y] ? row[trendCols.revCols[y]] : findVal(COL_MAP['rev' + y] || []));
+      const realMargin = parseFloat(trendCols.marginCols[y] ? row[trendCols.marginCols[y]] : findVal(COL_MAP['margin' + y] || []));
+      if (!isNaN(realRev)) {
+        yearly[y].rev = realRev;
+        yearly[y].margin = Math.round(realRev * (gm / 100));
+      }
       if (!isNaN(realMargin)) yearly[y].margin = realMargin;
     }
     emp.yearly = yearly;

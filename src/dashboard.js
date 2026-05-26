@@ -108,6 +108,7 @@ function handleFile(file) {
 }
 
 function refreshAll() {
+  syncTrendYearsFromData();
   initOverview();
   renderForecast();
   resetFilters();
@@ -115,6 +116,16 @@ function refreshAll() {
   renderAttrition();
   renderPortfolio();
   renderTrend();
+}
+
+function syncTrendYearsFromData() {
+  const years = [...new Set(DATA.flatMap(e =>
+    e.yearly ? Object.keys(e.yearly).map(y => parseInt(y, 10)).filter(Number.isFinite) : []
+  ))].sort((a, b) => a - b);
+  if (years.length > 0) {
+    TREND_YEARS = years;
+    TREND_REF_YEAR = years[years.length - 1];
+  }
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────────
@@ -321,17 +332,19 @@ function renderForecast() {
 
 // ── Attrition ────────────────────────────────────────────────────────────────
 function renderAttrition() {
+  const attrTitle = el('attr-trend-title');
+  if (attrTitle) attrTitle.textContent = `Attrition trend (${TREND_YEARS[0]}–${TREND_REF_YEAR})`;
   const hc        = DATA.length;
   const totalRev  = DATA.reduce((s, e) => s + e.annualRev, 0);
   const avgSalary = hc > 0 ? DATA.reduce((s, e) => s + e.salary, 0) / hc : 0;
 
   const real = ATTRITION_DATA;
-  const haveRealTrend = !!(real && real.trend && real.trend[2025]);
+  const haveRealTrend = !!(real && real.trend && real.trend[TREND_REF_YEAR]);
 
   // KPIs: prefer real 2025 figures; otherwise fall back to tenure heuristic
   let attrRate, retRate, revAtRisk, replaceCost;
   if (haveRealTrend) {
-    const t2025 = real.trend[2025];
+    const t2025 = real.trend[TREND_REF_YEAR];
     attrRate    = Math.round(t2025.attritionRate * 100);
     retRate     = Math.round(t2025.retentionRate * 100);
     // Revenue at risk: prefer real revenue-lost figure, else apply rate to portfolio
@@ -356,16 +369,16 @@ function renderAttrition() {
   const note = el('a-source-note');
   if (note) {
     note.textContent = haveRealTrend
-      ? 'Source: attrition_analysis sheet (2025 actuals). Per-year rates, by-role breakdown and revenue lost read directly from the workbook.'
-      : 'Source: tenure heuristic (employees with <8 or >42 months counted as at-risk). Populate the attrition_analysis sheet for real 2023–2025 rates.';
+      ? `Source: attrition_analysis sheet (${TREND_REF_YEAR} actuals). Per-year rates, by-role breakdown and revenue lost read directly from the workbook.`
+      : `Source: tenure heuristic (employees with <8 or >42 months counted as at-risk). Populate the attrition_analysis sheet for real ${TREND_YEARS[0]}–${TREND_REF_YEAR} rates.`;
   }
 
   // Trend chart: real per-year rates if available
   if (haveRealTrend) {
     const rates = TREND_YEARS.map(y => Math.round((real.trend[y].attritionRate || 0) * 100));
-    renderAttritionTrendChart(rates);
+    renderAttritionTrendChart(rates, null, TREND_YEARS);
   } else {
-    renderAttritionTrendChart(attrRate);
+    renderAttritionTrendChart(attrRate, null, TREND_YEARS);
   }
 
   // By-role chart: real percentages if available
@@ -414,9 +427,9 @@ function renderAttritionAnalysis() {
     );
     const hasSegmentFilter = cF !== '' || rF !== '' || lF !== '';
     const real = ATTRITION_DATA;
-    const haveRealTrend = !!(real && real.trend && real.trend[2025]);
+    const haveRealTrend = !!(real && real.trend && real.trend[TREND_REF_YEAR]);
     const currentAttrRate = filtered.length > 0 ? Math.round(filtered.filter(e => e.months < 8 || e.months > 42).length / filtered.length * 100) : 0;
-    const fallbackRates = [12, 14, currentAttrRate];
+    const fallbackRates = TREND_YEARS.map((_, i) => i === TREND_YEARS.length - 1 ? currentAttrRate : (i === 0 ? 12 : 14));
     const rows = TREND_YEARS.map((year, i) => {
       const active = filtered.filter(e => e.yearly && e.yearly[year] && e.yearly[year].rev > 0);
       const prevActive = i > 0 ? filtered.filter(e => e.yearly && e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
@@ -438,7 +451,7 @@ function renderAttritionAnalysis() {
       };
     });
     // Determine rows to display: explicitly check for valid year values
-    const validYears = TREND_YEARS.map(String); // ['2023','2024','2025']
+    const validYears = TREND_YEARS.map(String);
     let tableRows = (yearF && validYears.includes(yearF))
       ? rows.filter(r => String(r.year) === yearF)
       : rows; // 'All years' (empty value) or unrecognised → show all
@@ -484,12 +497,25 @@ function populateFilter(selectId, field) {
 function resetFilters() {
   populateFilter('filter-client', 'client');
   populateFilter('filter-role',   'role');
+  populateYearFilter('tr-year', 'All years');
+  populateYearFilter('aa-year', 'All years');
   populateFilter('tr-client',     'client');
   populateFilter('tr-role',       'role');
   populateFilter('tr-loc',        'loc');
   populateFilter('aa-client',     'client');
   populateFilter('aa-role',       'role');
   populateFilter('aa-loc',        'loc');
+}
+
+function populateYearFilter(id, allLabel) {
+  const sel = el(id);
+  if (!sel) return;
+  const current = sel.value;
+  const range = TREND_YEARS.length > 0 ? `${TREND_YEARS[0]}–${TREND_YEARS[TREND_YEARS.length - 1]}` : '';
+  sel.innerHTML = `<option value="">${escapeHTML(allLabel)}${range ? ` (${range})` : ''}</option>` +
+    TREND_YEARS.map(y => `<option value="${y}">${y}</option>`).join('');
+  const fallback = String(TREND_REF_YEAR);
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : fallback;
 }
 
 function renderPortfolio() {
@@ -529,6 +555,10 @@ function renderPortfolio() {
 
 // ── Historical Trend ─────────────────────────────────────────────────────────
 function renderTrend() {
+  const intro = el('trend-intro');
+  if (intro) {
+    intro.textContent = `Year-over-year performance across ${TREND_YEARS[0]}–${TREND_REF_YEAR}. Year filter focuses the KPIs and breakdown; comparison charts always show all available years.`;
+  }
   const yearF = el('tr-year').value;
   const cF    = el('tr-client').value;
   const rF    = el('tr-role').value;
@@ -542,16 +572,16 @@ function renderTrend() {
 
   // Aggregate per year across the filtered set
   const perYear = TREND_YEARS.map(y => {
-    const active = filtered.filter(e => e.yearly[y] && e.yearly[y].rev > 0);
-    const rev    = filtered.reduce((s, e) => s + (e.yearly[y]?.rev    || 0), 0);
-    const margin = filtered.reduce((s, e) => s + (e.yearly[y]?.margin || 0), 0);
+    const active = filtered.filter(e => e.yearly && e.yearly[y] && e.yearly[y].rev > 0);
+    const rev    = filtered.reduce((s, e) => s + (e.yearly?.[y]?.rev    || 0), 0);
+    const margin = filtered.reduce((s, e) => s + (e.yearly?.[y]?.margin || 0), 0);
     const gm     = rev > 0 ? (margin / rev * 100) : 0;
     return { year: y, hc: active.length, rev, margin, gm };
   });
 
   // KPIs reflect the focus year (defaults to the latest year)
-  const focusYear = parseInt(yearF) || TREND_REF_YEAR;
-  const focusIdx  = TREND_YEARS.indexOf(focusYear);
+  const focusYear = TREND_YEARS.includes(parseInt(yearF)) ? parseInt(yearF) : TREND_REF_YEAR;
+  const focusIdx  = Math.max(0, TREND_YEARS.indexOf(focusYear));
   const focus     = perYear[focusIdx];
   const prev      = focusIdx > 0 ? perYear[focusIdx - 1] : null;
 
@@ -605,7 +635,7 @@ function getForecastSeries() {
 
 function getAttritionTrendInput() {
   const real = ATTRITION_DATA;
-  if (real && real.trend && real.trend[2025]) {
+  if (real && real.trend && real.trend[TREND_REF_YEAR]) {
     return TREND_YEARS.map(y => Math.round((real.trend[y].attritionRate || 0) * 100));
   }
   const hc = DATA.length;
@@ -624,9 +654,9 @@ function getAttritionAnalysisRows() {
   );
   const hasSegmentFilter = cF !== '' || rF !== '' || lF !== '';
   const real = ATTRITION_DATA;
-  const haveRealTrend = !!(real && real.trend && real.trend[2025]);
+  const haveRealTrend = !!(real && real.trend && real.trend[TREND_REF_YEAR]);
   const currentAttrRate = filtered.length > 0 ? Math.round(filtered.filter(e => e.months < 8 || e.months > 42).length / filtered.length * 100) : 0;
-  const fallbackRates = [12, 14, currentAttrRate];
+  const fallbackRates = TREND_YEARS.map((_, i) => i === TREND_YEARS.length - 1 ? currentAttrRate : (i === 0 ? 12 : 14));
   const rows = TREND_YEARS.map((year, i) => {
     const active = filtered.filter(e => e.yearly && e.yearly[year] && e.yearly[year].rev > 0);
     const prevActive = i > 0 ? filtered.filter(e => e.yearly && e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
@@ -702,7 +732,7 @@ const FS_CHART_MAP = {
     renderRPRChart(s.rprH, s.rprP, 'c-fs-canvas', forecastYears);
   },
   'c-aa-trend': () => renderAttritionAnalysisChart(getAttritionAnalysisRows(), 'c-fs-canvas'),
-  'c-attr-trend': () => renderAttritionTrendChart(getAttritionTrendInput(), 'c-fs-canvas'),
+  'c-attr-trend': () => renderAttritionTrendChart(getAttritionTrendInput(), 'c-fs-canvas', TREND_YEARS),
   'c-attr-role': () => renderAttritionByRoleChart(DATA, ATTRITION_DATA?.byRole, 'c-fs-canvas'),
   'c-feat': () => renderFeatureImportanceChart('c-fs-canvas'),
   'c-bubble': () => renderBubbleChart(getPortfolioFilteredData(), 'c-fs-canvas'),
