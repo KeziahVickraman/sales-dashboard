@@ -27,6 +27,9 @@
           <i class="ti ti-file-import"></i> Import JSON
         </button>
         <input type="file" id="json-import-trigger" accept=".json" style="display:none" onchange="importJSON(this.files[0])" />
+        <button class="btn-outline" onclick="showPanel('slides')">
+          <i class="ti ti-presentation"></i> Generate Slides
+        </button>
         <button class="btn-primary" onclick="document.getElementById('upload-trigger').click()">
           <i class="ti ti-upload"></i> Upload Excel
         </button>
@@ -99,6 +102,9 @@
 
           <h4><i class="ti ti-file-import" style="margin-right:5px"></i>Viewing a colleague's dashboard</h4>
           <p>Received a JSON snapshot from a colleague? Click <strong>Import JSON</strong> in the top-right corner and select the file. The dashboard will load exactly as they left it — same data, same scenario growth rates — so you can explore and analyse without needing the original Excel file.</p>
+
+          <h4><i class="ti ti-presentation" style="margin-right:5px"></i>Present to Directors?</h4>
+          <p>Generate a quick 5-slide slide deck for high level reporting.</p>
 
           <p class="transparency-note" style="margin-top:14px">💡 Let's build something great together!</p>
         </div>
@@ -226,7 +232,10 @@
           <div class="kpi"><div class="kpi-label">3-yr CAGR</div><div class="kpi-value" id="fc-cagr">—</div></div>
         </div>
         <div class="card">
-          <div class="card-title">Revenue forecast 2023–2028 with confidence band</div>
+          <div class="card-title-row">
+            <span class="card-title">Revenue forecast 2023–2028 with confidence band</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-forecast','Revenue forecast 2023–2028 with confidence band')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+          </div>
           <div class="legend">
             <span><span class="leg-sq" style="background:#378ADD"></span>Historic</span>
             <span><span class="leg-sq" style="background:#1D9E75"></span>Projected</span>
@@ -235,8 +244,8 @@
           <div class="chart-wrap h240"><canvas id="c-forecast" role="img" aria-label="Revenue forecast chart">Forecast.</canvas></div>
         </div>
         <div class="row-2">
-          <div class="card"><div class="card-title">Headcount projection</div><div class="chart-wrap h180"><canvas id="c-hcfc" role="img" aria-label="Headcount forecast">HC forecast.</canvas></div></div>
-          <div class="card"><div class="card-title">Revenue per resource</div><div class="chart-wrap h180"><canvas id="c-rpr" role="img" aria-label="Revenue per resource trend">RPR trend.</canvas></div></div>
+          <div class="card"><div class="card-title-row"><span class="card-title">Headcount projection</span><button class="btn-expand" onclick="openChartFullscreen('c-hcfc','Headcount projection')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button></div><div class="chart-wrap h180"><canvas id="c-hcfc" role="img" aria-label="Headcount forecast">HC forecast.</canvas></div></div>
+          <div class="card"><div class="card-title-row"><span class="card-title">Revenue per resource</span><button class="btn-expand" onclick="openChartFullscreen('c-rpr','Revenue per resource')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button></div><div class="chart-wrap h180"><canvas id="c-rpr" role="img" aria-label="Revenue per resource trend">RPR trend.</canvas></div></div>
         </div>
         <div class="card">
           <div class="card-title">Projection table (model output)</div>
@@ -339,7 +348,10 @@
           <select id="aa-loc" onchange="renderAttritionAnalysis()"><option value="">All locations</option></select>
         </div>
         <div class="card">
-          <div class="card-title">Attrition analysis trend</div>
+          <div class="card-title-row">
+            <span class="card-title">Attrition analysis trend</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-aa-trend','Attrition analysis trend')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+          </div>
           <div class="legend"><span><span class="leg-sq" style="background:#E24B4A"></span>Attrition</span><span><span class="leg-sq" style="background:#1D9E75"></span>Retention</span><span><span class="leg-sq" style="background:#BA7517"></span>Revenue lost</span></div>
           <div class="chart-wrap h240"><canvas id="c-aa-trend" role="img" aria-label="Attrition analysis trend">Attrition analysis trend.</canvas></div>
         </div>
@@ -363,12 +375,18 @@
         </div>
         <div class="row-2">
           <div class="card">
-            <div class="card-title">Attrition trend (2023–2025)</div>
+            <div class="card-title-row">
+              <span class="card-title">Attrition trend (2023–2025)</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-attr-trend','Attrition trend (2023–2025)')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="legend"><span><span class="leg-sq" style="background:#E24B4A"></span>Attrition</span><span><span class="leg-sq" style="background:#1D9E75"></span>Retention</span></div>
             <div class="chart-wrap h200"><canvas id="c-attr-trend" role="img" aria-label="Attrition trend">Attrition trend.</canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Attrition by role</div>
+            <div class="card-title-row">
+              <span class="card-title">Attrition by role</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-attr-role','Attrition by role')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="chart-wrap h200"><canvas id="c-attr-role" role="img" aria-label="Attrition by role">Attrition by role.</canvas></div>
           </div>
         </div>
@@ -382,7 +400,10 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title">ML feature importance — attrition drivers</div>
+          <div class="card-title-row">
+            <span class="card-title">ML feature importance — attrition drivers</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-feat','ML feature importance — attrition drivers')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+          </div>
           <div class="chart-wrap h180"><canvas id="c-feat" role="img" aria-label="Feature importance">Feature importance.</canvas></div>
         </div>
         <div class="card transparency-card">
@@ -435,7 +456,10 @@
           <div class="kpi"><div class="kpi-label">Avg GM%</div><div class="kpi-value" id="pf-gm">—</div></div>
         </div>
         <div class="card">
-          <div class="card-title">Revenue vs GM% — bubble size = tenure</div>
+          <div class="card-title-row">
+            <span class="card-title">Revenue vs GM% — bubble size = tenure</span>
+            <button class="btn-expand" onclick="openChartFullscreen('c-bubble','Revenue vs GM% — bubble size = tenure')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+          </div>
           <div class="chart-wrap h240"><canvas id="c-bubble" role="img" aria-label="Bubble chart revenue vs GM%">Bubble chart.</canvas></div>
         </div>
         <div class="card" style="overflow-x:auto">
@@ -501,7 +525,10 @@
         </div>
         <div class="row-2">
           <div class="card">
-            <div class="card-title">Revenue &amp; margin by year</div>
+            <div class="card-title-row">
+              <span class="card-title">Revenue &amp; margin by year</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-tr-rev','Revenue & margin by year')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="legend">
               <span><span class="leg-sq" style="background:#378ADD"></span>Revenue</span>
               <span><span class="leg-sq" style="background:#1D9E75"></span>Margin</span>
@@ -509,17 +536,26 @@
             <div class="chart-wrap h240"><canvas id="c-tr-rev" role="img" aria-label="Revenue and margin by year">Revenue &amp; margin trend.</canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Headcount by year</div>
+            <div class="card-title-row">
+              <span class="card-title">Headcount by year</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-tr-hc','Headcount by year')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="chart-wrap h240"><canvas id="c-tr-hc" role="img" aria-label="Headcount by year">Headcount trend.</canvas></div>
           </div>
         </div>
         <div class="row-2">
           <div class="card">
-            <div class="card-title">Revenue by client across years</div>
+            <div class="card-title-row">
+              <span class="card-title">Revenue by client across years</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-tr-client','Revenue by client across years')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="chart-wrap h240"><canvas id="c-tr-client" role="img" aria-label="Revenue by client across years">Revenue by client.</canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Revenue by role across years</div>
+            <div class="card-title-row">
+              <span class="card-title">Revenue by role across years</span>
+              <button class="btn-expand" onclick="openChartFullscreen('c-tr-role','Revenue by role across years')" title="Expand to fullscreen"><i class="ti ti-arrows-maximize"></i></button>
+            </div>
             <div class="chart-wrap h240"><canvas id="c-tr-role" role="img" aria-label="Revenue by role across years">Revenue by role.</canvas></div>
           </div>
         </div>
@@ -557,6 +593,46 @@
           <div id="ai-q-status" style="display:none; margin-top:10px" class="status-bar status-loading"><span class="spinner"></span><span>Thinking...</span></div>
           <div id="ai-q-output" class="ai-insight" style="display:none; margin-top:10px"></div>
         </div>
+
+      </section>
+
+      <!-- SLIDE DECK GENERATOR -->
+      <section id="panel-slides" class="panel">
+        <div class="card" id="deck-generator">
+          <div class="ai-label"><i class="ti ti-presentation"></i> Slide Deck Generator — Director Briefing</div>
+          <p class="section-intro">Upload your exported dashboard JSON to generate a 5-slide PowerPoint deck ready for directors.</p>
+
+          <div class="deck-upload-zone" id="deck-drop-zone">
+            <input type="file" id="deck-file-input" accept=".json" style="display:none" />
+            <i class="ti ti-file-type-json" style="font-size:28px; color:var(--color-text-muted); display:block; margin-bottom:8px;"></i>
+            <div style="font-size:14px; font-weight:500; margin-bottom:4px;">Drop your dashboard export JSON here</div>
+            <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:12px;">or use the data already loaded in the dashboard</div>
+            <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+              <button class="btn-outline" id="deck-browse-btn"><i class="ti ti-upload"></i> Browse JSON file</button>
+              <button class="btn-primary" id="deck-use-current-btn"><i class="ti ti-database"></i> Use current data</button>
+            </div>
+          </div>
+
+          <div id="deck-status" style="display:none"></div>
+          <div id="deck-loaded-badge" style="display:none" class="status-bar status-success"></div>
+
+          <div id="deck-generate-section" style="display:none; margin-top:1rem;">
+            <div style="font-size:13px; color:var(--color-text-secondary); margin-bottom:10px;">Ready to generate. This builds all 5 slides in your browser — no server needed.</div>
+            <button class="btn-primary" id="deck-generate-btn" style="width:100%; justify-content:center; padding:12px;">
+              <i class="ti ti-sparkles"></i> Generate Director Slide Deck
+            </button>
+          </div>
+
+          <div id="deck-result" style="display:none; margin-top:1rem; text-align:center;">
+            <div class="status-bar status-success" style="justify-content:center; margin-bottom:12px;">
+              <i class="ti ti-check"></i><span>5-slide deck generated successfully</span>
+            </div>
+            <button class="btn-primary" id="deck-download-btn" style="font-size:14px; padding:10px 24px;">
+              <i class="ti ti-download"></i> Download director_briefing.pptx
+            </button>
+            <div style="font-size:11px; color:var(--color-text-secondary); margin-top:8px;">Charts are fully editable in PowerPoint</div>
+          </div>
+        </div>
       </section>
 
       <!-- Chart fullscreen modal -->
@@ -579,9 +655,11 @@
     </main>
   </div>
 
-  <script src="src/data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="src/config.js"></script>
+  <script src="src/data.js"></script>
   <script src="src/charts.js"></script>
+  <script src="src/slides.js"></script>
   <script src="src/dashboard.js"></script>
 </body>
 </html>

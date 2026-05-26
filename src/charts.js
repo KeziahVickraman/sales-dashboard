@@ -120,8 +120,8 @@ function renderLocationChart(data, targetId) {
 
 // ── Forecast charts ──────────────────────────────────────────────────────────
 
-function renderForecastChart(hist, proj) {
-  mkChart('c-forecast', {
+function renderForecastChart(hist, proj, targetId) {
+  mkChart(targetId || 'c-forecast', {
     type: 'line',
     data: {
       labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
@@ -140,8 +140,8 @@ function renderForecastChart(hist, proj) {
   });
 }
 
-function renderHeadcountForecastChart(hcH, hcP) {
-  mkChart('c-hcfc', {
+function renderHeadcountForecastChart(hcH, hcP, targetId) {
+  mkChart(targetId || 'c-hcfc', {
     type: 'bar',
     data: {
       labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
@@ -158,8 +158,8 @@ function renderHeadcountForecastChart(hcH, hcP) {
   });
 }
 
-function renderRPRChart(rprH, rprP) {
-  mkChart('c-rpr', {
+function renderRPRChart(rprH, rprP, targetId) {
+  mkChart(targetId || 'c-rpr', {
     type: 'line',
     data: {
       labels: ['2023', '2024', '2025', '2026', '2027', '2028'],
@@ -180,12 +180,12 @@ function renderRPRChart(rprH, rprP) {
  *   - a single number → falls back to the legacy synthetic [12, 14, X] pattern
  *   - an array of 3 numbers (percentages) → plots real 2023/2024/2025 rates
  */
-function renderAttritionTrendChart(attrRateOrRates) {
+function renderAttritionTrendChart(attrRateOrRates, targetId) {
   const rates = Array.isArray(attrRateOrRates)
     ? attrRateOrRates
     : [12, 14, attrRateOrRates];
   const retention = rates.map(r => 100 - r);
-  mkChart('c-attr-trend', {
+  mkChart(targetId || 'c-attr-trend', {
     type: 'line',
     data: {
       labels: ['2023', '2024', '2025'],
@@ -206,7 +206,7 @@ function renderAttritionTrendChart(attrRateOrRates) {
  * If realByRole is provided (array of { role, attritionPct }), it plots those
  * verbatim; otherwise falls back to the tenure heuristic over `data`.
  */
-function renderAttritionByRoleChart(data, realByRole) {
+function renderAttritionByRoleChart(data, realByRole, targetId) {
   let labels, values;
   if (realByRole && realByRole.length) {
     labels = realByRole.map(r => r.role);
@@ -219,7 +219,7 @@ function renderAttritionByRoleChart(data, realByRole) {
         : Math.round(emp.filter(e => e.months < 8 || e.months > 42).length / emp.length * 100);
     });
   }
-  mkChart('c-attr-role', {
+  mkChart(targetId || 'c-attr-role', {
     type: 'bar',
     data: {
       labels,
@@ -238,8 +238,8 @@ function renderAttritionByRoleChart(data, realByRole) {
   });
 }
 
-function renderAttritionAnalysisChart(rows) {
-  mkChart('c-aa-trend', {
+function renderAttritionAnalysisChart(rows, targetId) {
+  mkChart(targetId || 'c-aa-trend', {
     type: 'bar',
     data: {
       labels: rows.map(r => String(r.year)),
@@ -263,8 +263,8 @@ function renderAttritionAnalysisChart(rows) {
   });
 }
 
-function renderFeatureImportanceChart() {
-  mkChart('c-feat', {
+function renderFeatureImportanceChart(targetId) {
+  mkChart(targetId || 'c-feat', {
     type: 'bar',
     data: {
       labels: ['Tenure pattern', 'Low GM%', 'New hire < 6mo', 'Role category', 'Visa status', 'Location'],
@@ -281,8 +281,8 @@ function renderFeatureImportanceChart() {
 
 // ── Historical trend charts ──────────────────────────────────────────────────
 
-function renderTrendRevenueChart(perYear) {
-  mkChart('c-tr-rev', {
+function renderTrendRevenueChart(perYear, targetId) {
+  mkChart(targetId || 'c-tr-rev', {
     type: 'bar',
     data: {
       labels: perYear.map(p => String(p.year)),
@@ -299,8 +299,8 @@ function renderTrendRevenueChart(perYear) {
   });
 }
 
-function renderTrendHeadcountChart(perYear) {
-  mkChart('c-tr-hc', {
+function renderTrendHeadcountChart(perYear, targetId) {
+  mkChart(targetId || 'c-tr-hc', {
     type: 'line',
     data: {
       labels: perYear.map(p => String(p.year)),
@@ -320,9 +320,9 @@ function renderTrendHeadcountChart(perYear) {
   });
 }
 
-function renderTrendByClientChart(data, years) {
+function renderTrendByClientChart(data, years, targetId) {
   const clients = [...new Set(data.map(e => e.client))].sort();
-  mkChart('c-tr-client', {
+  mkChart(targetId || 'c-tr-client', {
     type: 'bar',
     data: {
       labels: clients,
@@ -346,9 +346,9 @@ function renderTrendByClientChart(data, years) {
   });
 }
 
-function renderTrendByRoleChart(data, years) {
+function renderTrendByRoleChart(data, years, targetId) {
   const roles = [...new Set(data.map(e => e.role))].sort();
-  mkChart('c-tr-role', {
+  mkChart(targetId || 'c-tr-role', {
     type: 'bar',
     data: {
       labels: roles,
@@ -374,7 +374,7 @@ function renderTrendByRoleChart(data, years) {
 
 // ── Portfolio bubble chart ───────────────────────────────────────────────────
 
-function renderBubbleChart(data) {
+function renderBubbleChart(data, targetId) {
   const clients = [...new Set(data.map(e => e.client))];
   const colorMap = {};
   clients.forEach((c, i) => { colorMap[c] = PALETTE[i % PALETTE.length]; });
@@ -382,7 +382,7 @@ function renderBubbleChart(data) {
   const xMin = gmValues.length ? Math.max(0, Math.min(...gmValues) - 2) : 0;
   const xMax = gmValues.length ? Math.max(...gmValues) + 2 : 25;
 
-  mkChart('c-bubble', {
+  mkChart(targetId || 'c-bubble', {
     type: 'bubble',
     data: {
       datasets: clients.map(client => {

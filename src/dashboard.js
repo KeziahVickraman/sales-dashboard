@@ -332,8 +332,8 @@ function renderAttritionAnalysis() {
     const currentAttrRate = filtered.length > 0 ? Math.round(filtered.filter(e => e.months < 8 || e.months > 42).length / filtered.length * 100) : 0;
     const fallbackRates = [12, 14, currentAttrRate];
     const rows = TREND_YEARS.map((year, i) => {
-      const active = filtered.filter(e => e.yearly[year] && e.yearly[year].rev > 0);
-      const prevActive = i > 0 ? filtered.filter(e => e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
+      const active = filtered.filter(e => e.yearly && e.yearly[year] && e.yearly[year].rev > 0);
+      const prevActive = i > 0 ? filtered.filter(e => e.yearly && e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
       const activeRev = active.reduce((s, e) => s + (e.yearly[year]?.rev || 0), 0);
       const proxyRate = active.length > 0 ? active.filter(e => e.months < 8 || e.months > 42).length / active.length : fallbackRates[i] / 100;
       const trend = haveRealTrend && !hasSegmentFilter ? real.trend[year] : null;
@@ -351,10 +351,16 @@ function renderAttritionAnalysis() {
         retentionPct: Math.round(retention * 100),
       };
     });
-    const tableRows = yearF ? rows.filter(r => String(r.year) === yearF) : rows;
-    renderAttritionAnalysisChart(tableRows);
-    analysisBody.innerHTML = tableRows.map(row => {
-      return `<tr>
+    // Determine rows to display: explicitly check for valid year values
+    const validYears = TREND_YEARS.map(String); // ['2023','2024','2025']
+    let tableRows = (yearF && validYears.includes(yearF))
+      ? rows.filter(r => String(r.year) === yearF)
+      : rows; // 'All years' (empty value) or unrecognised → show all
+    // Safety fallback: never leave the table empty when data exists
+    if (tableRows.length === 0 && rows.length > 0) tableRows = rows;
+    // Populate table first — always succeeds regardless of chart state
+    analysisBody.innerHTML = tableRows.map(row =>
+      `<tr>
         <td><strong>${row.year}</strong></td>
         <td>${escapeHTML(row.openingHC)}</td>
         <td>${escapeHTML(row.newHires)}</td>
@@ -362,8 +368,10 @@ function renderAttritionAnalysis() {
         <td>${row.attritionPct}%</td>
         <td>${row.retentionPct}%</td>
         <td>${fmt(row.revenueLost)}</td>
-      </tr>`;
-    }).join('');
+      </tr>`
+    ).join('');
+    // Render chart after table — wrapped so any chart error doesn't block the table
+    try { renderAttritionAnalysisChart(tableRows); } catch(chartErr) { console.warn('Attrition chart error:', chartErr); }
   }
 }
 
@@ -505,13 +513,142 @@ function renderTrend() {
 
 // ── Chart fullscreen modal ───────────────────────────────────────────────────
 
-/** Maps each Overview canvas ID to a function that renders it into a target ID */
+function getForecastSeries() {
+  const sc = SCENARIOS[currentScenario];
+  const base2025Rev = DATA.reduce((s, e) => s + e.annualRev, 0);
+  const base2025HC = DATA.length;
+  const hist = [base2025Rev * 0.68, base2025Rev * 0.82, base2025Rev];
+  const proj = [hist[2] * (1 + sc.growth[0]), 0, 0];
+  proj[1] = proj[0] * (1 + sc.growth[1]);
+  proj[2] = proj[1] * (1 + sc.growth[2]);
+  const hcH = [Math.round(base2025HC * 0.72), Math.round(base2025HC * 0.85), base2025HC];
+  const hcP = [Math.round(base2025HC * (1 + sc.hcGrowth[0])), 0, 0];
+  hcP[1] = Math.round(hcP[0] * (1 + sc.hcGrowth[1]));
+  hcP[2] = Math.round(hcP[1] * (1 + sc.hcGrowth[2]));
+  const safeDiv = (a, b) => b > 0 ? a / b : 0;
+  return {
+    hist,
+    proj,
+    hcH,
+    hcP,
+    rprH: hist.map((r, i) => safeDiv(r, hcH[i])),
+    rprP: proj.map((r, i) => safeDiv(r, hcP[i])),
+  };
+}
+
+function getAttritionTrendInput() {
+  const real = ATTRITION_DATA;
+  if (real && real.trend && real.trend[2025]) {
+    return TREND_YEARS.map(y => Math.round((real.trend[y].attritionRate || 0) * 100));
+  }
+  const hc = DATA.length;
+  return hc > 0 ? Math.round(DATA.filter(e => e.months < 8 || e.months > 42).length / hc * 100) : 0;
+}
+
+function getAttritionAnalysisRows() {
+  const yearF = el('aa-year')?.value || '';
+  const cF = el('aa-client')?.value || '';
+  const rF = el('aa-role')?.value || '';
+  const lF = el('aa-loc')?.value || '';
+  const filtered = DATA.filter(e =>
+    (cF === '' || e.client === cF) &&
+    (rF === '' || e.role === rF) &&
+    (lF === '' || e.loc === lF)
+  );
+  const hasSegmentFilter = cF !== '' || rF !== '' || lF !== '';
+  const real = ATTRITION_DATA;
+  const haveRealTrend = !!(real && real.trend && real.trend[2025]);
+  const currentAttrRate = filtered.length > 0 ? Math.round(filtered.filter(e => e.months < 8 || e.months > 42).length / filtered.length * 100) : 0;
+  const fallbackRates = [12, 14, currentAttrRate];
+  const rows = TREND_YEARS.map((year, i) => {
+    const active = filtered.filter(e => e.yearly && e.yearly[year] && e.yearly[year].rev > 0);
+    const prevActive = i > 0 ? filtered.filter(e => e.yearly && e.yearly[TREND_YEARS[i - 1]] && e.yearly[TREND_YEARS[i - 1]].rev > 0) : [];
+    const activeRev = active.reduce((s, e) => s + (e.yearly[year]?.rev || 0), 0);
+    const proxyRate = active.length > 0 ? active.filter(e => e.months < 8 || e.months > 42).length / active.length : fallbackRates[i] / 100;
+    const trend = haveRealTrend && !hasSegmentFilter ? real.trend[year] : null;
+    const impact = real?.revenueImpact?.[year];
+    const rate = trend ? trend.attritionRate : fallbackRates[i] / 100;
+    const filteredRate = trend ? rate : proxyRate;
+    const retention = trend ? trend.retentionRate : 1 - filteredRate;
+    return {
+      year,
+      openingHC: trend ? trend.openingHC : active.length,
+      newHires: trend ? trend.newHires : Math.max(0, active.length - prevActive.length),
+      left: trend ? trend.left : Math.round(active.length * filteredRate),
+      revenueLost: trend && impact?.revenueLost ? impact.revenueLost : activeRev * filteredRate,
+      attritionPct: Math.round(filteredRate * 100),
+      retentionPct: Math.round(retention * 100),
+    };
+  });
+  const validYears = TREND_YEARS.map(String);
+  const tableRows = (yearF && validYears.includes(yearF)) ? rows.filter(r => String(r.year) === yearF) : rows;
+  return tableRows.length === 0 && rows.length > 0 ? rows : tableRows;
+}
+
+function getPortfolioFilteredData() {
+  const cSel = el('filter-client')?.value || '';
+  const rSel = el('filter-role')?.value || '';
+  const sortBy = el('sort-by')?.value || 'rev';
+  const data = DATA.filter(e => (cSel === '' || e.client === cSel) && (rSel === '' || e.role === rSel));
+  if (sortBy === 'rev') data.sort((a, b) => b.annualRev - a.annualRev);
+  if (sortBy === 'gm') data.sort((a, b) => b.gm - a.gm);
+  if (sortBy === 'tenure') data.sort((a, b) => b.months - a.months);
+  return data;
+}
+
+function getTrendInputs() {
+  const cF = el('tr-client')?.value || '';
+  const rF = el('tr-role')?.value || '';
+  const lF = el('tr-loc')?.value || '';
+  const filtered = DATA.filter(e =>
+    (cF === '' || e.client === cF) &&
+    (rF === '' || e.role === rF) &&
+    (lF === '' || e.loc === lF)
+  );
+  const perYear = TREND_YEARS.map(y => {
+    const active = filtered.filter(e => e.yearly && e.yearly[y] && e.yearly[y].rev > 0);
+    const rev = filtered.reduce((s, e) => s + (e.yearly?.[y]?.rev || 0), 0);
+    const margin = filtered.reduce((s, e) => s + (e.yearly?.[y]?.margin || 0), 0);
+    const gm = rev > 0 ? (margin / rev * 100) : 0;
+    return { year: y, hc: active.length, rev, margin, gm };
+  });
+  return { filtered, perYear };
+}
+
+/** Maps each chart canvas ID to a function that renders it into the fullscreen target */
 const FS_CHART_MAP = {
   'c-role':    () => renderRoleRevenueChart(DATA, 'c-fs-canvas'),
   'c-monthly': () => renderMonthlyChart(DATA,     'c-fs-canvas'),
   'c-gm':      () => renderGMHistogram(DATA,      'c-fs-canvas'),
   'c-visa':    () => renderVisaChart(DATA,         'c-fs-canvas'),
   'c-loc':     () => renderLocationChart(DATA,     'c-fs-canvas'),
+  'c-forecast': () => {
+    const s = getForecastSeries();
+    renderForecastChart(s.hist, s.proj, 'c-fs-canvas');
+  },
+  'c-hcfc': () => {
+    const s = getForecastSeries();
+    renderHeadcountForecastChart(s.hcH, s.hcP, 'c-fs-canvas');
+  },
+  'c-rpr': () => {
+    const s = getForecastSeries();
+    renderRPRChart(s.rprH, s.rprP, 'c-fs-canvas');
+  },
+  'c-aa-trend': () => renderAttritionAnalysisChart(getAttritionAnalysisRows(), 'c-fs-canvas'),
+  'c-attr-trend': () => renderAttritionTrendChart(getAttritionTrendInput(), 'c-fs-canvas'),
+  'c-attr-role': () => renderAttritionByRoleChart(DATA, ATTRITION_DATA?.byRole, 'c-fs-canvas'),
+  'c-feat': () => renderFeatureImportanceChart('c-fs-canvas'),
+  'c-bubble': () => renderBubbleChart(getPortfolioFilteredData(), 'c-fs-canvas'),
+  'c-tr-rev': () => renderTrendRevenueChart(getTrendInputs().perYear, 'c-fs-canvas'),
+  'c-tr-hc': () => renderTrendHeadcountChart(getTrendInputs().perYear, 'c-fs-canvas'),
+  'c-tr-client': () => {
+    const t = getTrendInputs();
+    renderTrendByClientChart(t.filtered, TREND_YEARS, 'c-fs-canvas');
+  },
+  'c-tr-role': () => {
+    const t = getTrendInputs();
+    renderTrendByRoleChart(t.filtered, TREND_YEARS, 'c-fs-canvas');
+  },
 };
 
 function openChartFullscreen(canvasId, title) {
@@ -688,11 +825,133 @@ function importJSON(file) {
   reader.readAsText(file);
 }
 
+// ── Slide Deck Generator ─────────────────────────────────────────────────────
+
+let deckEmployees = null;
+
+function initDeckGenerator() {
+  const dropZone    = el('deck-drop-zone');
+  const fileInput   = el('deck-file-input');
+  const browseBtn   = el('deck-browse-btn');
+  const currentBtn  = el('deck-use-current-btn');
+  const generateBtn = el('deck-generate-btn');
+  const downloadBtn = el('deck-download-btn');
+
+  if (!dropZone || !fileInput || !browseBtn || !currentBtn || !generateBtn || !downloadBtn) return;
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  browseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+
+  currentBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadDeckData(DATA);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) parseDeckJSON(fileInput.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) parseDeckJSON(e.dataTransfer.files[0]);
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    if (!deckEmployees) return;
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner"></span> Building slides...';
+    showDeckStatus('Building slides...', 'loading');
+    try {
+      await generateDeck(deckEmployees);
+      el('deck-status').style.display = 'none';
+      el('deck-result').style.display = 'block';
+      el('deck-generate-section').style.display = 'none';
+    } catch (err) {
+      showDeckStatus('Error: ' + err.message, 'error');
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.innerHTML = '<i class="ti ti-sparkles"></i> Generate Director Slide Deck';
+    }
+  });
+
+  downloadBtn.addEventListener('click', async () => {
+    if (deckEmployees) await generateDeck(deckEmployees);
+  });
+}
+
+function parseDeckJSON(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const arr = Array.isArray(parsed) ? parsed
+                : Array.isArray(parsed.employees) ? parsed.employees
+                : Array.isArray(parsed.data) ? parsed.data
+                : null;
+      if (!arr || arr.length === 0) throw new Error('No employee array found in JSON.');
+      loadDeckData(normaliseDeckEmployees(arr));
+    } catch (err) {
+      showDeckStatus('Parse error: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function normaliseDeckEmployees(arr) {
+  const required = ['name', 'client', 'role', 'gm', 'annualRev', 'annualMargin', 'months', 'salary'];
+  const normalised = arr.map(e => ({
+    ...e,
+    annualRev: e.annualRev ?? e.annualRevenue ?? 0,
+    annualMargin: e.annualMargin ?? e.margin ?? 0,
+  }));
+  const invalid = normalised.find(e => required.some(key => e[key] === undefined || e[key] === null || e[key] === ''));
+  if (invalid) {
+    throw new Error('JSON does not match expected schema. Check it was exported from this dashboard.');
+  }
+  return normalised;
+}
+
+function loadDeckData(employees) {
+  try {
+    deckEmployees = normaliseDeckEmployees(employees);
+  } catch (err) {
+    showDeckStatus('Error: ' + err.message, 'error');
+    return;
+  }
+  const badge = el('deck-loaded-badge');
+  badge.style.display = 'flex';
+  badge.innerHTML = `<i class="ti ti-check"></i><span>Loaded ${deckEmployees.length} employees — ready to generate</span>`;
+  el('deck-status').style.display = 'none';
+  el('deck-generate-section').style.display = 'block';
+  el('deck-result').style.display = 'none';
+}
+
+function showDeckStatus(msg, type) {
+  const statusEl = el('deck-status');
+  statusEl.style.display = 'flex';
+  statusEl.className = 'status-bar status-' + type;
+  const icon = type === 'loading' ? '<span class="spinner"></span>'
+             : type === 'error' ? '<i class="ti ti-x"></i>'
+             : '<i class="ti ti-check"></i>';
+  statusEl.innerHTML = `${icon}<span>${escapeHTML(msg)}</span>`;
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 (function init() {
   initOverview();
   resetFilters();
   renderPortfolio();
+  initDeckGenerator();
   // Close fullscreen modal on Escape key
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeChartFullscreen();
